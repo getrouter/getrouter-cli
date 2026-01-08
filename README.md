@@ -51,6 +51,7 @@ getrouter login
 ```
 
 Follow the printed URL in your browser, then the CLI will poll until it receives tokens.
+Re-running `getrouter login` will overwrite the local auth state with new tokens.
 
 ## Common Commands
 
@@ -73,6 +74,12 @@ Notes:
 
 ```bash
 getrouter codex
+```
+
+To remove GetRouter entries from Codex config/auth:
+
+```bash
+getrouter codex uninstall
 ```
 
 Files written (codex):

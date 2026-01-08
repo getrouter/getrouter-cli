@@ -17,10 +17,24 @@ export type KeyMenuAction =
   | "delete"
   | "exit";
 
-const sortByCreatedAtDesc = (consumers: Consumer[]) =>
+const parseTimestamp = (value?: string) => {
+  const parsed = Date.parse(value ?? "");
+  return Number.isNaN(parsed) ? 0 : parsed;
+};
+
+const getUpdatedAtTime = (consumer: Consumer) => {
+  const updatedAt = parseTimestamp(consumer.updatedAt);
+  if (updatedAt) return updatedAt;
+  return parseTimestamp(consumer.createdAt);
+};
+
+const getDisplayTimestamp = (consumer: Consumer) =>
+  consumer.updatedAt ?? consumer.createdAt ?? "-";
+
+export const sortConsumersByUpdatedAtDesc = (consumers: Consumer[]) =>
   consumers.slice().sort((a, b) => {
-    const aTime = Date.parse(a.createdAt ?? "") || 0;
-    const bTime = Date.parse(b.createdAt ?? "") || 0;
+    const aTime = getUpdatedAtTime(a);
+    const bTime = getUpdatedAtTime(b);
     return bTime - aTime;
   });
 
@@ -40,9 +54,9 @@ const buildNameCounts = (consumers: Consumer[]) => {
 
 const formatChoice = (consumer: Consumer, nameCounts: Map<string, number>) => {
   const name = normalizeName(consumer);
-  const createdAt = consumer.createdAt ?? "-";
+  const displayTimestamp = getDisplayTimestamp(consumer);
   const needsDetail = (nameCounts.get(name) ?? 0) > 1 || name === "(unnamed)";
-  return needsDetail ? `${name} (${createdAt})` : name;
+  return needsDetail ? `${name} (${displayTimestamp})` : name;
 };
 
 export const selectKeyAction = async (): Promise<KeyMenuAction> => {
@@ -127,16 +141,18 @@ export const selectConsumer = async (
   if (consumers.length === 0) {
     throw new Error("No available API keys");
   }
-  const sorted = sortByCreatedAtDesc(consumers);
+  const sorted = sortConsumersByUpdatedAtDesc(consumers);
   const nameCounts = buildNameCounts(sorted);
   const selected = await fuzzySelect({
     message: "🔎 Search keys",
     choices: sorted.map((consumer) => ({
       title: formatChoice(consumer, nameCounts),
       value: consumer,
-      keywords: [normalizeName(consumer), consumer.createdAt ?? ""].filter(
-        Boolean,
-      ),
+      keywords: [
+        normalizeName(consumer),
+        consumer.updatedAt ?? "",
+        consumer.createdAt ?? "",
+      ].filter(Boolean),
     })),
   });
   return selected ?? null;
@@ -158,7 +174,7 @@ export const selectConsumerList = async (
   if (consumers.length === 0) {
     throw new Error("No available API keys");
   }
-  const sorted = sortByCreatedAtDesc(consumers);
+  const sorted = sortConsumersByUpdatedAtDesc(consumers);
   const nameCounts = buildNameCounts(sorted);
   const response = await prompts({
     type: "select",

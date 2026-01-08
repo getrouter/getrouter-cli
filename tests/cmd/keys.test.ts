@@ -19,6 +19,7 @@ const mockConsumer = {
   apiKey: "abcd1234WXYZ",
   lastAccess: "2026-01-02T00:00:00Z",
   createdAt: "2026-01-01T00:00:00Z",
+  updatedAt: "2026-01-02T00:00:00Z",
 };
 
 const emptyAuthService = {} as AuthService;
@@ -110,6 +111,39 @@ describe("keys command", () => {
     await program.parseAsync(["node", "getrouter", "keys", "--show"]);
     const output = log.mock.calls.map((c) => c[0]).join("\n");
     expect(output).toContain("abcd1234WXYZ");
+    log.mockRestore();
+  });
+
+  it("sorts keys by updatedAt desc in list output", async () => {
+    setStdinTTY(false);
+    const consumers = [
+      {
+        ...mockConsumer,
+        id: "c1",
+        name: "older-key",
+        updatedAt: "2026-01-02T00:00:00Z",
+      },
+      {
+        ...mockConsumer,
+        id: "c2",
+        name: "newer-key",
+        updatedAt: "2026-01-03T00:00:00Z",
+      },
+    ];
+    (createApiClients as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
+      consumerService: {
+        ListConsumers: vi.fn().mockResolvedValue({ consumers }),
+      } as unknown as ConsumerService,
+      subscriptionService: emptySubscriptionService,
+      authService: emptyAuthService,
+    });
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+    const program = createProgram();
+    await program.parseAsync(["node", "getrouter", "keys", "list"]);
+    const output = log.mock.calls.map((c) => c[0]).join("\n");
+    expect(output.indexOf("newer-key")).toBeLessThan(
+      output.indexOf("older-key"),
+    );
     log.mockRestore();
   });
 

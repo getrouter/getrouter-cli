@@ -25,15 +25,14 @@ describe("codex interactive helpers", () => {
       ok: true,
       status: 200,
       json: vi.fn().mockResolvedValue({
-        models: ["new-codex-model-xyz"],
+        models: ["older-codex-model", "newer-codex-model"],
       }),
     });
     vi.stubGlobal("fetch", fetchMock);
 
     const choices = await getCodexModelChoices();
-    expect(
-      choices.some((choice) => choice.value === "new-codex-model-xyz"),
-    ).toBe(true);
+    expect(choices[0]?.value).toBe("newer-codex-model");
+    expect(choices[1]?.value).toBe("older-codex-model");
     expect(String(fetchMock.mock.calls[0]?.[0] ?? "")).toContain(
       "/v1/dashboard/providers/models?tag=codex",
     );

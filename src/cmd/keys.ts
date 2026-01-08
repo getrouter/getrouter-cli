@@ -7,6 +7,7 @@ import {
   promptKeyEnabled,
   promptKeyName,
   selectConsumerList,
+  sortConsumersByUpdatedAtDesc,
 } from "../core/interactive/keys";
 import { renderTable } from "../core/output/table";
 import type {
@@ -103,7 +104,8 @@ const listConsumers = async (
     (res) => res?.consumers ?? [],
     (res) => res?.nextPageToken || undefined,
   );
-  outputConsumers(consumers, showApiKey);
+  const sorted = sortConsumersByUpdatedAtDesc(consumers);
+  outputConsumers(sorted, showApiKey);
 };
 
 const resolveConsumerForUpdate = async (

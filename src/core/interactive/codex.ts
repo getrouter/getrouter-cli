@@ -48,8 +48,7 @@ export const getCodexModelChoices = async (): Promise<
     }));
 
     if (remoteChoices.length > 0) {
-      remoteChoices.sort((a, b) => a.title.localeCompare(b.title));
-      return remoteChoices;
+      return remoteChoices.reverse();
     }
   } catch {}
 
@@ -58,16 +57,11 @@ export const getCodexModelChoices = async (): Promise<
 
 export const REASONING_CHOICES: ReasoningChoice[] = [
   {
-    id: "low",
-    label: "Low",
-    value: "low",
-    description: "Fast responses with lighter reasoning",
-  },
-  {
-    id: "medium",
-    label: "Medium (default)",
-    value: "medium",
-    description: "Balances speed and reasoning depth for everyday tasks",
+    id: "extra_high",
+    label: "Extra high",
+    value: "xhigh",
+    description:
+      "Extra high reasoning depth for complex problems. Warning: Extra high reasoning effort can quickly consume Plus plan rate limits.",
   },
   {
     id: "high",
@@ -76,11 +70,16 @@ export const REASONING_CHOICES: ReasoningChoice[] = [
     description: "Greater reasoning depth for complex problems",
   },
   {
-    id: "extra_high",
-    label: "Extra high",
-    value: "xhigh",
-    description:
-      "Extra high reasoning depth for complex problems. Warning: Extra high reasoning effort can quickly consume Plus plan rate limits.",
+    id: "medium",
+    label: "Medium (default)",
+    value: "medium",
+    description: "Balances speed and reasoning depth for everyday tasks",
+  },
+  {
+    id: "low",
+    label: "Low",
+    value: "low",
+    description: "Fast responses with lighter reasoning",
   },
 ];
 

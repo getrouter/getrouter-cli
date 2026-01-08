@@ -51,6 +51,7 @@ getrouter login
 ```
 
 按提示打开浏览器完成确认，CLI 会轮询直到拿到 token。
+即使已登录，也可再次执行 `getrouter login`，会用新 token 覆盖本地 auth.json。
 
 ## 常用命令
 
@@ -73,6 +74,12 @@ getrouter login
 
 ```bash
 getrouter codex
+```
+
+如需移除 Codex 配置/认证中的 GetRouter 条目：
+
+```bash
+getrouter codex uninstall
 ```
 
 写入文件（codex）：

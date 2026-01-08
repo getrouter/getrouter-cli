@@ -51,6 +51,7 @@ getrouter login
 ```
 
 表示された URL をブラウザで開くと、CLI はトークンを受け取るまでポーリングします。
+すでにログイン済みでも `getrouter login` を再実行すると、ローカルの auth.json は新しいトークンで上書きされます。
 
 ## よく使うコマンド
 
@@ -73,6 +74,12 @@ getrouter login
 
 ```bash
 getrouter codex
+```
+
+Codex の設定/認証から GetRouter の項目を削除する場合:
+
+```bash
+getrouter codex uninstall
 ```
 
 書き込まれるファイル（codex）:
