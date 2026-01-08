@@ -1,5 +1,11 @@
 # GetRouter CLI
 
+[![CI](https://github.com/getrouter/getrouter-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/getrouter/getrouter-cli/actions/workflows/ci.yml)
+[![npm version](https://img.shields.io/npm/v/@getrouter/getrouter-cli)](https://www.npmjs.com/package/@getrouter/getrouter-cli)
+[![npm downloads](https://img.shields.io/npm/dm/@getrouter/getrouter-cli)](https://www.npmjs.com/package/@getrouter/getrouter-cli)
+[![node](https://img.shields.io/node/v/@getrouter/getrouter-cli)](https://www.npmjs.com/package/@getrouter/getrouter-cli)
+[![bun](https://img.shields.io/badge/bun-1.3.5-000?logo=bun&logoColor=white)](https://bun.sh)
+
 CLI for getrouter.dev — manage API keys, subscriptions, and configure vibecoding tools.
 
 English | [简体中文](README.zh-cn.md) | [日本語](README.ja.md)
