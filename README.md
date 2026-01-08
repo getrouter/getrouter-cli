@@ -128,4 +128,4 @@ Edit `~/.getrouter/config.json` directly to update CLI settings.
 - `bun run test` — run the test suite
 - `bun run typecheck` — run TypeScript type checks
 
-[![Download History](https://npmcharts.com/compare/@getrouter/getrouter-cli?minimal=true)](https://npmcharts.com/compare/@getrouter/getrouter-cli)
+[![Download History (last 30 days)](https://quickchart.io/chart/render/zf-3cc45f8d-a7de-4553-bdfa-877c4592ce59)](https://www.npmjs.com/package/@getrouter/getrouter-cli)
