@@ -10,6 +10,7 @@ type RequestInput = {
   body?: unknown;
   fetchImpl?: typeof fetch;
   maxRetries?: number;
+  includeAuth?: boolean;
   /** For testing: override the sleep function used for retry delays */
   _retrySleep?: (ms: number) => Promise<void>;
 };
@@ -63,18 +64,23 @@ export const requestJson = async <T = unknown>({
   body,
   fetchImpl,
   maxRetries = 3,
+  includeAuth = true,
   _retrySleep,
 }: RequestInput): Promise<T> => {
   return withRetry(
     async () => {
-      const auth = readAuth();
+      const auth = includeAuth
+        ? readAuth()
+        : { accessToken: undefined, refreshToken: undefined };
       const url = buildApiUrl(path);
-      const headers = buildHeaders(auth.accessToken);
+      const headers = includeAuth
+        ? buildHeaders(auth.accessToken)
+        : buildHeaders();
 
       let res = await doFetch(url, method, headers, body, fetchImpl);
 
       // On 401, attempt token refresh and retry once
-      if (res.status === 401 && auth.refreshToken) {
+      if (includeAuth && res.status === 401 && auth.refreshToken) {
         const refreshed = await refreshAccessToken({ fetchImpl });
         if (refreshed?.accessToken) {
           const newHeaders = buildHeaders(refreshed.accessToken);

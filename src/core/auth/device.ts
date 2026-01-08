@@ -33,29 +33,44 @@ export const generateAuthCode = () => {
 export const buildLoginUrl = (authCode: string) =>
   `https://getrouter.dev/auth/${authCode}`;
 
-export const openLoginUrl = async (url: string) => {
+const spawnBrowser = (command: string, args: string[]) => {
   try {
-    if (process.platform === "darwin") {
-      const child = spawn("open", [url], {
-        stdio: "ignore",
-        detached: true,
-      });
-      child.unref();
-      return;
-    }
-    if (process.platform === "win32") {
-      const child = spawn("cmd", ["/c", "start", "", url], {
-        stdio: "ignore",
-        detached: true,
-      });
-      child.unref();
-      return;
-    }
-    const child = spawn("xdg-open", [url], {
+    const child = spawn(command, args, {
       stdio: "ignore",
       detached: true,
     });
+    child.on("error", (err) => {
+      const code =
+        typeof err === "object" && err !== null && "code" in err
+          ? (err as { code?: string }).code
+          : undefined;
+      const reason =
+        code === "ENOENT"
+          ? ` (${command} not found)`
+          : code
+            ? ` (${code})`
+            : "";
+      console.log(
+        `⚠️ Unable to open browser${reason}. Please open the URL manually.`,
+      );
+    });
     child.unref();
+  } catch {
+    console.log("⚠️ Unable to open browser. Please open the URL manually.");
+  }
+};
+
+export const openLoginUrl = async (url: string) => {
+  try {
+    if (process.platform === "darwin") {
+      spawnBrowser("open", [url]);
+      return;
+    }
+    if (process.platform === "win32") {
+      spawnBrowser("cmd", ["/c", "start", "", url]);
+      return;
+    }
+    spawnBrowser("xdg-open", [url]);
   } catch {
     // best effort
   }

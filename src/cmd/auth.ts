@@ -14,7 +14,7 @@ export const registerAuthCommands = (program: Command) => {
     .command("login")
     .description("Login with device flow")
     .action(async () => {
-      const { authService } = createApiClients({});
+      const { authService } = createApiClients({ includeAuth: false });
       const authCode = generateAuthCode();
       const url = buildLoginUrl(authCode);
       console.log("🔐 To authenticate, visit:");

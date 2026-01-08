@@ -51,6 +51,36 @@ describe("requestJson", () => {
     expect(headers.Cookie).toBe("access_token=t");
   });
 
+  it("skips auth headers when includeAuth is false", async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "getrouter-"));
+    process.env.GETROUTER_CONFIG_DIR = dir;
+    fs.writeFileSync(
+      path.join(dir, "auth.json"),
+      JSON.stringify({ accessToken: "t" }),
+    );
+
+    const fetchSpy = vi.fn(
+      async (_input: RequestInfo | URL, _init?: RequestInit) =>
+        ({
+          ok: true,
+          json: async () => ({ ok: true }),
+        }) as Response,
+    );
+
+    await requestJson({
+      path: "/v1/test",
+      method: "GET",
+      fetchImpl: fetchSpy as unknown as typeof fetch,
+      includeAuth: false,
+    });
+
+    const call = fetchSpy.mock.calls[0] as Parameters<typeof fetch> | undefined;
+    const init = call?.[1];
+    const headers = (init?.headers ?? {}) as Record<string, string>;
+    expect(headers.Authorization).toBeUndefined();
+    expect(headers.Cookie).toBeUndefined();
+  });
+
   it("uses GETROUTER_AUTH_COOKIE when set", async () => {
     process.env.GETROUTER_AUTH_COOKIE = "router_auth";
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "getrouter-"));

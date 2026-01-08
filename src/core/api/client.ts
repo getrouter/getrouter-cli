@@ -46,9 +46,11 @@ export type ApiClients = {
 export const createApiClients = ({
   fetchImpl,
   clients,
+  includeAuth = true,
 }: {
   fetchImpl?: typeof fetch;
   clients?: ClientFactories;
+  includeAuth?: boolean;
 }): ApiClients => {
   const factories =
     clients ??
@@ -66,6 +68,7 @@ export const createApiClients = ({
       method,
       body: body ? JSON.parse(body) : undefined,
       fetchImpl,
+      includeAuth,
     });
   };
 
