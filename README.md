@@ -127,3 +127,5 @@ Edit `~/.getrouter/config.json` directly to update CLI settings.
 - `bun run format` — format and lint code with Biome
 - `bun run test` — run the test suite
 - `bun run typecheck` — run TypeScript type checks
+
+[![Download History](https://npmcharts.com/compare/@getrouter/getrouter-cli?minimal=true)](https://npmcharts.com/compare/@getrouter/getrouter-cli)
