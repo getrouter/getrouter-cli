@@ -15,6 +15,8 @@ const makeDir = () => fs.mkdtempSync(path.join(os.tmpdir(), "getrouter-"));
 const codexConfigPath = (dir: string) =>
   path.join(dir, ".codex", "config.toml");
 const codexAuthPath = (dir: string) => path.join(dir, ".codex", "auth.json");
+const codexBackupPath = (dir: string) =>
+  path.join(dir, ".getrouter", "codex-backup.json");
 
 const mockConsumer = { id: "c1", apiKey: "key-123" };
 
@@ -272,6 +274,104 @@ describe("codex command", () => {
     const auth = JSON.parse(fs.readFileSync(codexAuthPath(dir), "utf8"));
     expect(auth.OTHER).toBe("keep");
     expect(auth.OPENAI_API_KEY).toBeUndefined();
+  });
+
+  it("uninstall restores previous OPENAI_API_KEY when backup exists", async () => {
+    const dir = makeDir();
+    process.env.HOME = dir;
+    const codexDir = path.join(dir, ".codex");
+    fs.mkdirSync(codexDir, { recursive: true });
+    fs.mkdirSync(path.join(dir, ".getrouter"), { recursive: true });
+    fs.writeFileSync(
+      codexAuthPath(dir),
+      JSON.stringify(
+        {
+          OPENAI_API_KEY: "new-key",
+          _getrouter_codex_backup_openai_api_key: "legacy-backup",
+          _getrouter_codex_installed_openai_api_key: "legacy-installed",
+          OTHER: "keep",
+        },
+        null,
+        2,
+      ),
+    );
+    fs.writeFileSync(
+      codexBackupPath(dir),
+      JSON.stringify(
+        {
+          version: 1,
+          createdAt: "2026-01-01T00:00:00Z",
+          updatedAt: "2026-01-01T00:00:00Z",
+          auth: {
+            previousOpenaiKey: "old-key",
+            installedOpenaiKey: "new-key",
+          },
+        },
+        null,
+        2,
+      ),
+    );
+
+    const program = createProgram();
+    await program.parseAsync(["node", "getrouter", "codex", "uninstall"]);
+
+    const auth = JSON.parse(fs.readFileSync(codexAuthPath(dir), "utf8"));
+    expect(auth.OPENAI_API_KEY).toBe("old-key");
+    expect(auth._getrouter_codex_backup_openai_api_key).toBeUndefined();
+    expect(auth._getrouter_codex_installed_openai_api_key).toBeUndefined();
+    expect(auth.OTHER).toBe("keep");
+    expect(fs.existsSync(codexBackupPath(dir))).toBe(false);
+  });
+
+  it("uninstall restores previous model_provider and model", async () => {
+    setStdinTTY(true);
+    const dir = makeDir();
+    process.env.HOME = dir;
+    const codexDir = path.join(dir, ".codex");
+    fs.mkdirSync(codexDir, { recursive: true });
+    fs.writeFileSync(
+      codexConfigPath(dir),
+      [
+        'model = "user-model"',
+        'model_reasoning_effort = "low"',
+        'model_provider = "openai"',
+        "",
+        "[model_providers.openai]",
+        'name = "openai"',
+      ].join("\n"),
+    );
+
+    prompts.inject(["gpt-5.2-codex", "extra_high", mockConsumer]);
+    (createApiClients as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
+      consumerService: {
+        ListConsumers: vi.fn().mockResolvedValue({
+          consumers: [
+            {
+              id: "c1",
+              name: "dev",
+              enabled: true,
+              createdAt: "2026-01-01T00:00:00Z",
+            },
+          ],
+        }),
+        GetConsumer: vi.fn().mockResolvedValue(mockConsumer),
+      } as unknown as ConsumerService,
+    });
+
+    const program = createProgram();
+    await program.parseAsync(["node", "getrouter", "codex"]);
+    expect(fs.existsSync(codexBackupPath(dir))).toBe(true);
+    await program.parseAsync(["node", "getrouter", "codex", "uninstall"]);
+    expect(fs.existsSync(codexBackupPath(dir))).toBe(false);
+
+    const config = fs.readFileSync(codexConfigPath(dir), "utf8");
+    expect(config).toContain('model = "user-model"');
+    expect(config).toContain('model_reasoning_effort = "low"');
+    expect(config).toContain('model_provider = "openai"');
+    expect(config).toContain("[model_providers.openai]");
+    expect(config).not.toContain("[model_providers.getrouter]");
+    expect(config).not.toContain("_getrouter_codex_backup");
+    expect(config).not.toContain("_getrouter_codex_installed");
   });
 
   it("uninstall leaves root keys when provider is not getrouter", async () => {

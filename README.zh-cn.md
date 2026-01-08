@@ -86,6 +86,7 @@ getrouter codex uninstall
 
 - `~/.codex/config.toml`（model + reasoning + provider 设置）
 - `~/.codex/auth.json`（OPENAI_API_KEY）
+- `~/.getrouter/codex-backup.json`（用于 `getrouter codex uninstall` 的备份；卸载后会删除）
 
 `getrouter claude` 写入 Anthropic 兼容环境变量到 `~/.getrouter/env.sh`（或 `env.ps1`）。
 

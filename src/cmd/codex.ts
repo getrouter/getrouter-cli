@@ -3,6 +3,8 @@ import os from "node:os";
 import path from "node:path";
 import type { Command } from "commander";
 import { createApiClients } from "../core/api/client";
+import { readJsonFile, writeJsonFile } from "../core/config/fs";
+import { resolveConfigDir } from "../core/config/paths";
 import {
   getCodexModelChoices,
   mapReasoningValue,
@@ -12,13 +14,30 @@ import {
 import { fuzzySelect } from "../core/interactive/fuzzy";
 import { selectConsumer } from "../core/interactive/keys";
 import {
+  type CodexTomlRootValues,
   mergeAuthJson,
   mergeCodexToml,
+  readCodexTomlRootValues,
   removeAuthJson,
   removeCodexConfig,
 } from "../core/setup/codex";
 
 const CODEX_DIR = ".codex";
+const CODEX_BACKUP_FILE = "codex-backup.json";
+
+type CodexBackupFile = {
+  version: 1;
+  createdAt: string;
+  updatedAt: string;
+  config?: {
+    previous?: CodexTomlRootValues;
+    installed?: Required<CodexTomlRootValues>;
+  };
+  auth?: {
+    previousOpenaiKey?: string;
+    installedOpenaiKey?: string;
+  };
+};
 
 const readFileIfExists = (filePath: string) =>
   fs.existsSync(filePath) ? fs.readFileSync(filePath, "utf8") : "";
@@ -41,6 +60,24 @@ const ensureCodexDir = () => {
 };
 
 const resolveCodexDir = () => path.join(os.homedir(), CODEX_DIR);
+const resolveCodexBackupPath = () =>
+  path.join(resolveConfigDir(), CODEX_BACKUP_FILE);
+
+const readCodexBackup = (): CodexBackupFile | null => {
+  const backupPath = resolveCodexBackupPath();
+  const raw = readJsonFile<CodexBackupFile>(backupPath);
+  if (!raw || typeof raw !== "object") return null;
+  if ((raw as CodexBackupFile).version !== 1) return null;
+  return raw;
+};
+
+const writeCodexBackup = (backup: CodexBackupFile) => {
+  const backupPath = resolveCodexBackupPath();
+  writeJsonFile(backupPath, backup);
+  if (process.platform !== "win32") {
+    fs.chmodSync(backupPath, 0o600);
+  }
+};
 
 const requireInteractive = () => {
   if (!process.stdin.isTTY) {
@@ -110,13 +147,69 @@ export const registerCodexCommand = (program: Command) => {
       const authPath = path.join(codexDir, "auth.json");
 
       const existingConfig = readFileIfExists(configPath);
+      const existingRoot = readCodexTomlRootValues(existingConfig);
+
+      const existingAuth = readAuthJson(authPath);
+      const existingOpenaiKey =
+        typeof existingAuth.OPENAI_API_KEY === "string"
+          ? existingAuth.OPENAI_API_KEY
+          : undefined;
+
+      const now = new Date().toISOString();
+      const installedRoot = {
+        model: `"${model}"`,
+        reasoning: `"${reasoningValue}"`,
+        provider: `"getrouter"`,
+      };
+
+      const backup = readCodexBackup() ?? {
+        version: 1 as const,
+        createdAt: now,
+        updatedAt: now,
+      };
+      backup.updatedAt = now;
+      backup.config ??= {};
+      backup.config.previous ??= {};
+      if (
+        backup.config.previous.model === undefined &&
+        existingRoot.model &&
+        existingRoot.model !== installedRoot.model
+      ) {
+        backup.config.previous.model = existingRoot.model;
+      }
+      if (
+        backup.config.previous.reasoning === undefined &&
+        existingRoot.reasoning &&
+        existingRoot.reasoning !== installedRoot.reasoning
+      ) {
+        backup.config.previous.reasoning = existingRoot.reasoning;
+      }
+      if (
+        backup.config.previous.provider === undefined &&
+        existingRoot.provider &&
+        existingRoot.provider !== installedRoot.provider
+      ) {
+        backup.config.previous.provider = existingRoot.provider;
+      }
+      backup.config.installed = installedRoot;
+
+      backup.auth ??= {};
+      if (
+        backup.auth.previousOpenaiKey === undefined &&
+        existingOpenaiKey &&
+        existingOpenaiKey !== apiKey
+      ) {
+        backup.auth.previousOpenaiKey = existingOpenaiKey;
+      }
+      backup.auth.installedOpenaiKey = apiKey;
+      writeCodexBackup(backup);
+
       const mergedConfig = mergeCodexToml(existingConfig, {
         model,
         reasoning: reasoningValue,
       });
       fs.writeFileSync(configPath, mergedConfig, "utf8");
 
-      const existingAuth = readAuthJson(authPath);
       const mergedAuth = mergeAuthJson(existingAuth, apiKey);
       fs.writeFileSync(authPath, JSON.stringify(mergedAuth, null, 2));
       if (process.platform !== "win32") {
@@ -138,9 +231,14 @@ export const registerCodexCommand = (program: Command) => {
       const configExists = fs.existsSync(configPath);
       const authExists = fs.existsSync(authPath);
 
+      const backup = readCodexBackup();
+      const restoreRoot = backup?.config?.previous;
+      const restoreOpenaiKey = backup?.auth?.previousOpenaiKey;
+      const installedOpenaiKey = backup?.auth?.installedOpenaiKey;
+
       const configContent = configExists ? readFileIfExists(configPath) : "";
       const configResult = configExists
-        ? removeCodexConfig(configContent)
+        ? removeCodexConfig(configContent, { restoreRoot })
         : null;
 
       const authContent = authExists
@@ -151,7 +249,13 @@ export const registerCodexCommand = (program: Command) => {
           ? (JSON.parse(authContent) as Record<string, unknown>)
           : {}
         : null;
-      const authResult = authData ? removeAuthJson(authData) : null;
+      const authResult = authData
+        ? removeAuthJson(authData, {
+            force: true,
+            installed: installedOpenaiKey,
+            restore: restoreOpenaiKey,
+          })
+        : null;
 
       if (!configExists) {
         console.log(`ℹ️ ${configPath} not found`);
@@ -169,6 +273,11 @@ export const registerCodexCommand = (program: Command) => {
         console.log(`✅ Removed getrouter entries from ${authPath}`);
       } else {
         console.log(`ℹ️ No getrouter entries in ${authPath}`);
+      }
+
+      const backupPath = resolveCodexBackupPath();
+      if (fs.existsSync(backupPath)) {
+        fs.unlinkSync(backupPath);
       }
     });
 };

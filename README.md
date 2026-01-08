@@ -92,6 +92,7 @@ Files written (codex):
 
 - `~/.codex/config.toml` (model + reasoning + provider settings)
 - `~/.codex/auth.json` (OPENAI_API_KEY)
+- `~/.getrouter/codex-backup.json` (backup for `getrouter codex uninstall`; deleted on uninstall)
 
 `getrouter claude` writes Anthropic-compatible env vars to `~/.getrouter/env.sh` (or `env.ps1`).
 

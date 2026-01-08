@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { mergeAuthJson, mergeCodexToml } from "../../../src/core/setup/codex";
+import {
+  mergeAuthJson,
+  mergeCodexToml,
+  removeAuthJson,
+  removeCodexConfig,
+} from "../../../src/core/setup/codex";
 
 describe("codex setup helpers", () => {
   it("merges codex toml at root and provider table", () => {
@@ -34,5 +39,86 @@ describe("codex setup helpers", () => {
     const output = mergeAuthJson({ existing: "keep" }, "key-123");
     expect(output.OPENAI_API_KEY).toBe("key-123");
     expect(output.existing).toBe("keep");
+  });
+
+  it("removes getrouter provider section and restores root keys when provided", () => {
+    const input = [
+      'model = "gpt-5.2-codex"',
+      'model_reasoning_effort = "xhigh"',
+      'model_provider = "getrouter"',
+      "",
+      "[model_providers.getrouter]",
+      'name = "getrouter"',
+      "",
+      "[model_providers.openai]",
+      'name = "openai"',
+    ].join("\n");
+
+    const { content, changed } = removeCodexConfig(input, {
+      restoreRoot: {
+        model: '"user-model"',
+        reasoning: '"medium"',
+        provider: '"openai"',
+      },
+    });
+    expect(changed).toBe(true);
+    expect(content).toContain('model = "user-model"');
+    expect(content).toContain('model_reasoning_effort = "medium"');
+    expect(content).toContain('model_provider = "openai"');
+    expect(content).toContain("[model_providers.openai]");
+    expect(content).not.toContain("[model_providers.getrouter]");
+  });
+
+  it("removes root keys when provider is getrouter and no restore is provided", () => {
+    const input = [
+      'model = "gpt-5.2-codex"',
+      'model_reasoning_effort = "xhigh"',
+      'model_provider = "getrouter"',
+      "",
+      "[model_providers.getrouter]",
+      'name = "getrouter"',
+    ].join("\n");
+
+    const { content } = removeCodexConfig(input);
+    expect(content).not.toContain('model = "gpt-5.2-codex"');
+    expect(content).not.toContain('model_reasoning_effort = "xhigh"');
+    expect(content).not.toContain('model_provider = "getrouter"');
+    expect(content).not.toContain("[model_providers.getrouter]");
+  });
+
+  it("restores OPENAI_API_KEY when installed key matches current", () => {
+    const input = {
+      OPENAI_API_KEY: "new-key",
+      OTHER: "keep",
+    } as Record<string, unknown>;
+    const { data, changed } = removeAuthJson(input, {
+      installed: "new-key",
+      restore: "old-key",
+    });
+    expect(changed).toBe(true);
+    expect(data.OPENAI_API_KEY).toBe("old-key");
+    expect(data.OTHER).toBe("keep");
+  });
+
+  it("removes OPENAI_API_KEY when forced and no restore is available", () => {
+    const input = {
+      OPENAI_API_KEY: "new-key",
+      OTHER: "keep",
+    } as Record<string, unknown>;
+    const { data, changed } = removeAuthJson(input, { force: true });
+    expect(changed).toBe(true);
+    expect(data.OPENAI_API_KEY).toBeUndefined();
+    expect(data.OTHER).toBe("keep");
+  });
+
+  it("leaves OPENAI_API_KEY when not forced and not installed", () => {
+    const input = {
+      OPENAI_API_KEY: "user-key",
+      OTHER: "keep",
+    } as Record<string, unknown>;
+    const { data, changed } = removeAuthJson(input);
+    expect(changed).toBe(false);
+    expect(data.OPENAI_API_KEY).toBe("user-key");
+    expect(data.OTHER).toBe("keep");
   });
 });

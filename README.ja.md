@@ -86,6 +86,7 @@ getrouter codex uninstall
 
 - `~/.codex/config.toml`（model + reasoning + provider 設定）
 - `~/.codex/auth.json`（OPENAI_API_KEY）
+- `~/.getrouter/codex-backup.json`（`getrouter codex uninstall` 用のバックアップ。uninstall で削除）
 
 `getrouter claude` は Anthropic 互換の環境変数を `~/.getrouter/env.sh`（または `env.ps1`）へ書き込みます。
 
