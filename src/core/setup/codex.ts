@@ -277,15 +277,26 @@ const deleteRootKey = (rootLines: string[], key: string) => {
   setOrDeleteRootKey(rootLines, key, undefined);
 };
 
+const hasLegacyRootMarkers = (lines: string[]) =>
+  lines.some((line) => {
+    const keyMatch = matchKey(line);
+    const key = keyMatch?.[1];
+    return !!(key && LEGACY_TOML_ROOT_MARKERS.includes(key as never));
+  });
+
 export const removeCodexConfig = (
   content: string,
-  options?: { restoreRoot?: CodexTomlRootValues },
+  options?: {
+    restoreRoot?: CodexTomlRootValues;
+    allowRootRemoval?: boolean;
+  },
 ) => {
-  const { restoreRoot } = options ?? {};
+  const { restoreRoot, allowRootRemoval = true } = options ?? {};
   const lines = content.length ? content.split(/\r?\n/) : [];
   const providerIsGetrouter =
     normalizeTomlString(readRootValue(lines, "model_provider")) ===
     CODEX_PROVIDER;
+  const canRemoveRoot = allowRootRemoval || hasLegacyRootMarkers(lines);
 
   const stripped = stripGetrouterProviderSection(lines);
   const firstHeaderIndex = stripped.findIndex((line) => matchHeader(line));
@@ -293,7 +304,7 @@ export const removeCodexConfig = (
   const rootLines = stripLegacyMarkersFromRoot(stripped.slice(0, rootEnd));
   const restLines = stripped.slice(rootEnd);
 
-  if (providerIsGetrouter) {
+  if (providerIsGetrouter && canRemoveRoot) {
     if (restoreRoot) {
       setOrDeleteRootKey(rootLines, "model", restoreRoot.model);
       setOrDeleteRootKey(
@@ -326,14 +337,25 @@ export const removeCodexConfig = (
 export const removeAuthJson = (
   data: Record<string, unknown>,
   options?: {
-    force?: boolean;
     installed?: string;
     restore?: string;
   },
 ) => {
-  const { force = false, installed, restore } = options ?? {};
+  const { installed, restore } = options ?? {};
   const next: Record<string, unknown> = { ...data };
   let changed = false;
+
+  const legacyInstalled =
+    typeof next._getrouter_codex_installed_openai_api_key === "string"
+      ? (next._getrouter_codex_installed_openai_api_key as string)
+      : undefined;
+  const legacyRestore =
+    typeof next._getrouter_codex_backup_openai_api_key === "string"
+      ? (next._getrouter_codex_backup_openai_api_key as string)
+      : undefined;
+
+  const effectiveInstalled = installed ?? legacyInstalled;
+  const effectiveRestore = restore ?? legacyRestore;
 
   for (const key of LEGACY_AUTH_MARKERS) {
     if (key in next) {
@@ -347,11 +369,11 @@ export const removeAuthJson = (
       ? (next.OPENAI_API_KEY as string)
       : undefined;
   const restoreValue =
-    typeof restore === "string" && restore.trim().length > 0
-      ? restore
+    typeof effectiveRestore === "string" && effectiveRestore.trim().length > 0
+      ? effectiveRestore
       : undefined;
 
-  if (installed && current && current === installed) {
+  if (effectiveInstalled && current && current === effectiveInstalled) {
     if (restoreValue) {
       next.OPENAI_API_KEY = restoreValue;
     } else {
@@ -359,11 +381,6 @@ export const removeAuthJson = (
     }
     changed = true;
     return { data: next, changed };
-  }
-
-  if (force && current) {
-    delete next.OPENAI_API_KEY;
-    changed = true;
   }
 
   return { data: next, changed };

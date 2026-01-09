@@ -239,6 +239,64 @@ describe("codex command", () => {
     process.env.HOME = dir;
     const codexDir = path.join(dir, ".codex");
     fs.mkdirSync(codexDir, { recursive: true });
+    fs.mkdirSync(path.join(dir, ".getrouter"), { recursive: true });
+    fs.writeFileSync(
+      codexConfigPath(dir),
+      [
+        'theme = "dark"',
+        'model = "keep"',
+        'model_reasoning_effort = "low"',
+        'model_provider = "getrouter"',
+        "",
+        "[model_providers.getrouter]",
+        'name = "getrouter"',
+        'base_url = "https://api.getrouter.dev/codex"',
+        "",
+        "[model_providers.other]",
+        'name = "other"',
+      ].join("\n"),
+    );
+    fs.writeFileSync(
+      codexAuthPath(dir),
+      JSON.stringify({ OTHER: "keep", OPENAI_API_KEY: "old" }, null, 2),
+    );
+    fs.writeFileSync(
+      codexBackupPath(dir),
+      JSON.stringify(
+        {
+          version: 1,
+          createdAt: "2026-01-01T00:00:00Z",
+          updatedAt: "2026-01-01T00:00:00Z",
+          auth: {
+            installedOpenaiKey: "old",
+          },
+        },
+        null,
+        2,
+      ),
+    );
+
+    const program = createProgram();
+    await program.parseAsync(["node", "getrouter", "codex", "uninstall"]);
+
+    const config = fs.readFileSync(codexConfigPath(dir), "utf8");
+    expect(config).toContain('theme = "dark"');
+    expect(config).toContain("[model_providers.other]");
+    expect(config).not.toContain("[model_providers.getrouter]");
+    expect(config).not.toContain('model_provider = "getrouter"');
+    expect(config).not.toContain('model_reasoning_effort = "low"');
+    expect(config).not.toContain('model = "keep"');
+
+    const auth = JSON.parse(fs.readFileSync(codexAuthPath(dir), "utf8"));
+    expect(auth.OTHER).toBe("keep");
+    expect(auth.OPENAI_API_KEY).toBeUndefined();
+  });
+
+  it("uninstall preserves existing keys when backup is missing", async () => {
+    const dir = makeDir();
+    process.env.HOME = dir;
+    const codexDir = path.join(dir, ".codex");
+    fs.mkdirSync(codexDir, { recursive: true });
     fs.writeFileSync(
       codexConfigPath(dir),
       [
@@ -265,15 +323,13 @@ describe("codex command", () => {
 
     const config = fs.readFileSync(codexConfigPath(dir), "utf8");
     expect(config).toContain('theme = "dark"');
-    expect(config).toContain("[model_providers.other]");
-    expect(config).not.toContain("[model_providers.getrouter]");
-    expect(config).not.toContain('model_provider = "getrouter"');
-    expect(config).not.toContain('model_reasoning_effort = "low"');
-    expect(config).not.toContain('model = "keep"');
+    expect(config).toContain('model = "keep"');
+    expect(config).toContain('model_provider = "getrouter"');
+    expect(config).toContain('model_reasoning_effort = "low"');
 
     const auth = JSON.parse(fs.readFileSync(codexAuthPath(dir), "utf8"));
     expect(auth.OTHER).toBe("keep");
-    expect(auth.OPENAI_API_KEY).toBeUndefined();
+    expect(auth.OPENAI_API_KEY).toBe("old");
   });
 
   it("uninstall restores previous OPENAI_API_KEY when backup exists", async () => {

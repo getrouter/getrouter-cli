@@ -100,12 +100,12 @@ describe("codex setup helpers", () => {
     expect(data.OTHER).toBe("keep");
   });
 
-  it("removes OPENAI_API_KEY when forced and no restore is available", () => {
+  it("removes OPENAI_API_KEY when installed key matches and no restore is available", () => {
     const input = {
       OPENAI_API_KEY: "new-key",
       OTHER: "keep",
     } as Record<string, unknown>;
-    const { data, changed } = removeAuthJson(input, { force: true });
+    const { data, changed } = removeAuthJson(input, { installed: "new-key" });
     expect(changed).toBe(true);
     expect(data.OPENAI_API_KEY).toBeUndefined();
     expect(data.OTHER).toBe("keep");

@@ -235,10 +235,14 @@ export const registerCodexCommand = (program: Command) => {
       const restoreRoot = backup?.config?.previous;
       const restoreOpenaiKey = backup?.auth?.previousOpenaiKey;
       const installedOpenaiKey = backup?.auth?.installedOpenaiKey;
+      const hasBackup = Boolean(backup);
 
       const configContent = configExists ? readFileIfExists(configPath) : "";
       const configResult = configExists
-        ? removeCodexConfig(configContent, { restoreRoot })
+        ? removeCodexConfig(configContent, {
+            restoreRoot,
+            allowRootRemoval: hasBackup,
+          })
         : null;
 
       const authContent = authExists
@@ -251,7 +255,6 @@ export const registerCodexCommand = (program: Command) => {
         : null;
       const authResult = authData
         ? removeAuthJson(authData, {
-            force: true,
             installed: installedOpenaiKey,
             restore: restoreOpenaiKey,
           })

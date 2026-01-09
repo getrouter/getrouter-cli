@@ -139,7 +139,10 @@ export const selectConsumer = async (
     (res) => res?.nextPageToken || undefined,
   );
   if (consumers.length === 0) {
-    throw new Error("No available API keys");
+    console.log(
+      "No available API keys. Create one at https://getrouter.dev/dashboard/keys",
+    );
+    return null;
   }
   const sorted = sortConsumersByUpdatedAtDesc(consumers);
   const nameCounts = buildNameCounts(sorted);
@@ -172,7 +175,10 @@ export const selectConsumerList = async (
     (res) => res?.nextPageToken || undefined,
   );
   if (consumers.length === 0) {
-    throw new Error("No available API keys");
+    console.log(
+      "No available API keys. Create one at https://getrouter.dev/dashboard/keys",
+    );
+    return null;
   }
   const sorted = sortConsumersByUpdatedAtDesc(consumers);
   const nameCounts = buildNameCounts(sorted);
