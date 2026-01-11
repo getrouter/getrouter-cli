@@ -39,42 +39,82 @@ const PROVIDER_KEYS = [
   "requires_openai_auth",
 ] as const;
 
-const rootValues = (input: CodexConfigInput) => ({
-  model: `"${input.model}"`,
-  model_reasoning_effort: `"${input.reasoning}"`,
-  model_provider: `"${CODEX_PROVIDER}"`,
-});
+function splitLines(content: string): string[] {
+  if (content.length === 0) return [];
+  return content.split(/\r?\n/);
+}
 
-const providerValues = () => ({
-  name: `"${CODEX_PROVIDER}"`,
-  base_url: `"${CODEX_BASE_URL}"`,
-  wire_api: `"responses"`,
-  requires_openai_auth: "true",
-});
+function isLegacyTomlRootMarker(key: string): boolean {
+  return (LEGACY_TOML_ROOT_MARKERS as readonly string[]).includes(key);
+}
 
-const matchHeader = (line: string) => line.match(/^\s*\[([^\]]+)\]\s*$/);
-const matchKey = (line: string) => line.match(/^\s*([A-Za-z0-9_.-]+)\s*=/);
+function rootValues(
+  input: CodexConfigInput,
+): Record<(typeof ROOT_KEYS)[number], string> {
+  return {
+    model: `"${input.model}"`,
+    model_reasoning_effort: `"${input.reasoning}"`,
+    model_provider: `"${CODEX_PROVIDER}"`,
+  };
+}
 
-const findSectionEnd = (lines: string[], startIndex: number) => {
+function providerValues(): Record<(typeof PROVIDER_KEYS)[number], string> {
+  return {
+    name: `"${CODEX_PROVIDER}"`,
+    base_url: `"${CODEX_BASE_URL}"`,
+    wire_api: `"responses"`,
+    requires_openai_auth: "true",
+  };
+}
+
+const HEADER_RE = /^\s*\[([^\]]+)\]\s*$/;
+const KEY_RE = /^\s*([A-Za-z0-9_.-]+)\s*=/;
+
+function matchHeader(line: string): RegExpMatchArray | null {
+  return line.match(HEADER_RE);
+}
+
+function matchKey(line: string): RegExpMatchArray | null {
+  return line.match(KEY_RE);
+}
+
+function readKeyFromLine(line: string): string | undefined {
+  const match = matchKey(line);
+  return match?.[1];
+}
+
+function readStringValue(
+  data: Record<string, unknown>,
+  key: string,
+): string | undefined {
+  const value = data[key];
+  return typeof value === "string" ? value : undefined;
+}
+
+function findSectionEnd(lines: string[], startIndex: number): number {
   for (let i = startIndex; i < lines.length; i += 1) {
-    if (matchHeader(lines[i] ?? "")) {
+    const line = lines[i];
+    if (line !== undefined && matchHeader(line)) {
       return i;
     }
   }
   return lines.length;
-};
+}
 
-const upsertKeyLines = <K extends string>(
+function upsertKeyLines<K extends string>(
   lines: string[],
   startIndex: number,
   endIndex: number,
   keys: readonly K[],
   valueMap: Record<K, string>,
-) => {
+): Set<K> {
   const found = new Set<K>();
 
   for (let i = startIndex; i < endIndex; i += 1) {
-    const keyMatch = matchKey(lines[i] ?? "");
+    const line = lines[i];
+    if (line === undefined) continue;
+
+    const keyMatch = matchKey(line);
     if (!keyMatch) continue;
 
     const key = keyMatch[1] as K;
@@ -85,18 +125,19 @@ const upsertKeyLines = <K extends string>(
   }
 
   return found;
-};
+}
 
-const missingKeyLines = <K extends string>(
+function missingKeyLines<K extends string>(
   keys: readonly K[],
-  found: Set<K>,
+  found: ReadonlySet<K>,
   valueMap: Record<K, string>,
-) =>
-  keys
+): string[] {
+  return keys
     .filter((key) => !found.has(key))
     .map((key) => `${key} = ${valueMap[key]}`);
+}
 
-const parseTomlRhsValue = (rhs: string) => {
+function parseTomlRhsValue(rhs: string): string {
   const trimmed = rhs.trim();
   if (!trimmed) return "";
   const first = trimmed[0];
@@ -106,33 +147,31 @@ const parseTomlRhsValue = (rhs: string) => {
   }
   const hashIndex = trimmed.indexOf("#");
   return (hashIndex === -1 ? trimmed : trimmed.slice(0, hashIndex)).trim();
-};
+}
 
-const readRootValue = (lines: string[], key: string) => {
+function readRootValue(lines: string[], key: string): string | undefined {
   for (const line of lines) {
     if (matchHeader(line)) break;
-    const keyMatch = matchKey(line);
-    if (keyMatch?.[1] === key) {
-      const parts = line.split("=");
-      parts.shift();
-      return parseTomlRhsValue(parts.join("="));
+
+    const lineKey = readKeyFromLine(line);
+    if (lineKey === key) {
+      const rhs = line.slice(line.indexOf("=") + 1);
+      return parseTomlRhsValue(rhs);
     }
   }
   return undefined;
-};
+}
 
-export const readCodexTomlRootValues = (
-  content: string,
-): CodexTomlRootValues => {
-  const lines = content.length ? content.split(/\r?\n/) : [];
+export function readCodexTomlRootValues(content: string): CodexTomlRootValues {
+  const lines = splitLines(content);
   return {
     model: readRootValue(lines, "model"),
     reasoning: readRootValue(lines, "model_reasoning_effort"),
     provider: readRootValue(lines, "model_provider"),
   };
-};
+}
 
-const normalizeTomlString = (value?: string) => {
+function normalizeTomlString(value?: string): string {
   if (!value) return "";
   const trimmed = value.trim();
   if (
@@ -142,9 +181,9 @@ const normalizeTomlString = (value?: string) => {
     return trimmed.slice(1, -1).trim().toLowerCase();
   }
   return trimmed.replace(/['"]/g, "").trim().toLowerCase();
-};
+}
 
-const stripLegacyRootMarkers = (lines: string[]) => {
+function stripLegacyRootMarkers(lines: string[]): string[] {
   const updated: string[] = [];
   let inRoot = true;
 
@@ -153,23 +192,27 @@ const stripLegacyRootMarkers = (lines: string[]) => {
       inRoot = false;
     }
     if (inRoot) {
-      const keyMatch = matchKey(line);
-      const key = keyMatch?.[1];
-      if (key && LEGACY_TOML_ROOT_MARKERS.includes(key as never)) continue;
+      const key = readKeyFromLine(line);
+      if (key !== undefined && isLegacyTomlRootMarker(key)) continue;
     }
     updated.push(line);
   }
 
   return updated;
-};
+}
 
-export const mergeCodexToml = (content: string, input: CodexConfigInput) => {
-  const lines = content.length ? content.split(/\r?\n/) : [];
-  const updated = [...stripLegacyRootMarkers(lines)];
+export function mergeCodexToml(
+  content: string,
+  input: CodexConfigInput,
+): string {
+  const lines = splitLines(content);
+  const updated = stripLegacyRootMarkers(lines);
   const rootValueMap = rootValues(input);
   const providerValueMap = providerValues();
 
-  const firstHeaderIndex = updated.findIndex((line) => matchHeader(line ?? ""));
+  const firstHeaderIndex = updated.findIndex(
+    (line) => matchHeader(line) !== null,
+  );
   const rootEnd = firstHeaderIndex === -1 ? updated.length : firstHeaderIndex;
 
   const rootFound = upsertKeyLines(
@@ -225,12 +268,12 @@ export const mergeCodexToml = (content: string, input: CodexConfigInput) => {
   }
 
   return updated.join("\n");
-};
+}
 
-export const mergeAuthJson = (
+export function mergeAuthJson(
   data: Record<string, unknown>,
   apiKey: string,
-): Record<string, unknown> => {
+): Record<string, unknown> {
   const next: Record<string, unknown> = { ...data };
   for (const key of LEGACY_AUTH_MARKERS) {
     if (key in next) {
@@ -239,16 +282,16 @@ export const mergeAuthJson = (
   }
   next.OPENAI_API_KEY = apiKey;
   return next;
-};
+}
 
-const stripGetrouterProviderSection = (lines: string[]) => {
+function stripGetrouterProviderSection(lines: string[]): string[] {
   const updated: string[] = [];
   let skipSection = false;
 
   for (const line of lines) {
     const headerMatch = matchHeader(line);
     if (headerMatch) {
-      const section = headerMatch[1]?.trim() ?? "";
+      const section = headerMatch[1]?.trim();
       if (section === PROVIDER_SECTION) {
         skipSection = true;
         continue;
@@ -261,21 +304,21 @@ const stripGetrouterProviderSection = (lines: string[]) => {
   }
 
   return updated;
-};
+}
 
-const stripLegacyMarkersFromRoot = (rootLines: string[]) =>
-  rootLines.filter((line) => {
-    const keyMatch = matchKey(line);
-    const key = keyMatch?.[1];
-    return !(key && LEGACY_TOML_ROOT_MARKERS.includes(key as never));
+function stripLegacyMarkersFromRoot(rootLines: string[]): string[] {
+  return rootLines.filter((line) => {
+    const key = readKeyFromLine(line);
+    return !(key !== undefined && isLegacyTomlRootMarker(key));
   });
+}
 
-const setOrDeleteRootKey = (
+function setOrDeleteRootKey(
   rootLines: string[],
   key: string,
   value: string | undefined,
-) => {
-  const idx = rootLines.findIndex((line) => matchKey(line)?.[1] === key);
+): void {
+  const idx = rootLines.findIndex((line) => readKeyFromLine(line) === key);
   if (value === undefined) {
     if (idx !== -1) {
       rootLines.splice(idx, 1);
@@ -287,28 +330,28 @@ const setOrDeleteRootKey = (
   } else {
     rootLines.push(`${key} = ${value}`);
   }
-};
+}
 
-const deleteRootKey = (rootLines: string[], key: string) => {
+function deleteRootKey(rootLines: string[], key: string): void {
   setOrDeleteRootKey(rootLines, key, undefined);
-};
+}
 
-const hasLegacyRootMarkers = (lines: string[]) =>
-  lines.some((line) => {
-    const keyMatch = matchKey(line);
-    const key = keyMatch?.[1];
-    return !!(key && LEGACY_TOML_ROOT_MARKERS.includes(key as never));
+function hasLegacyRootMarkers(lines: string[]): boolean {
+  return lines.some((line) => {
+    const key = readKeyFromLine(line);
+    return key !== undefined && isLegacyTomlRootMarker(key);
   });
+}
 
-export const removeCodexConfig = (
+export function removeCodexConfig(
   content: string,
   options?: {
     restoreRoot?: CodexTomlRootValues;
     allowRootRemoval?: boolean;
   },
-) => {
+): { content: string; changed: boolean } {
   const { restoreRoot, allowRootRemoval = true } = options ?? {};
-  const lines = content.length ? content.split(/\r?\n/) : [];
+  const lines = splitLines(content);
   const providerIsGetrouter =
     normalizeTomlString(readRootValue(lines, "model_provider")) ===
     CODEX_PROVIDER;
@@ -348,27 +391,27 @@ export const removeCodexConfig = (
 
   const nextContent = recombined.join("\n");
   return { content: nextContent, changed: nextContent !== content };
-};
+}
 
-export const removeAuthJson = (
+export function removeAuthJson(
   data: Record<string, unknown>,
   options?: {
     installed?: string;
     restore?: string;
   },
-) => {
+): { data: Record<string, unknown>; changed: boolean } {
   const { installed, restore } = options ?? {};
   const next: Record<string, unknown> = { ...data };
   let changed = false;
 
-  const legacyInstalled =
-    typeof next._getrouter_codex_installed_openai_api_key === "string"
-      ? (next._getrouter_codex_installed_openai_api_key as string)
-      : undefined;
-  const legacyRestore =
-    typeof next._getrouter_codex_backup_openai_api_key === "string"
-      ? (next._getrouter_codex_backup_openai_api_key as string)
-      : undefined;
+  const legacyInstalled = readStringValue(
+    next,
+    "_getrouter_codex_installed_openai_api_key",
+  );
+  const legacyRestore = readStringValue(
+    next,
+    "_getrouter_codex_backup_openai_api_key",
+  );
 
   const effectiveInstalled = installed ?? legacyInstalled;
   const effectiveRestore = restore ?? legacyRestore;
@@ -380,14 +423,8 @@ export const removeAuthJson = (
     }
   }
 
-  const current =
-    typeof next.OPENAI_API_KEY === "string"
-      ? (next.OPENAI_API_KEY as string)
-      : undefined;
-  const restoreValue =
-    typeof effectiveRestore === "string" && effectiveRestore.trim().length > 0
-      ? effectiveRestore
-      : undefined;
+  const current = readStringValue(next, "OPENAI_API_KEY");
+  const restoreValue = effectiveRestore?.trim() ? effectiveRestore : undefined;
 
   if (effectiveInstalled && current && current === effectiveInstalled) {
     if (restoreValue) {
@@ -400,4 +437,4 @@ export const removeAuthJson = (
   }
 
   return { data: next, changed };
-};
+}
