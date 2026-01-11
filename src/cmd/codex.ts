@@ -168,40 +168,43 @@ export const registerCodexCommand = (program: Command) => {
         updatedAt: now,
       };
       backup.updatedAt = now;
+
       backup.config ??= {};
       backup.config.previous ??= {};
+      const previousConfig = backup.config.previous;
       if (
-        backup.config.previous.model === undefined &&
+        previousConfig.model === undefined &&
         existingRoot.model &&
         existingRoot.model !== installedRoot.model
       ) {
-        backup.config.previous.model = existingRoot.model;
+        previousConfig.model = existingRoot.model;
       }
       if (
-        backup.config.previous.reasoning === undefined &&
+        previousConfig.reasoning === undefined &&
         existingRoot.reasoning &&
         existingRoot.reasoning !== installedRoot.reasoning
       ) {
-        backup.config.previous.reasoning = existingRoot.reasoning;
+        previousConfig.reasoning = existingRoot.reasoning;
       }
       if (
-        backup.config.previous.provider === undefined &&
+        previousConfig.provider === undefined &&
         existingRoot.provider &&
         existingRoot.provider !== installedRoot.provider
       ) {
-        backup.config.previous.provider = existingRoot.provider;
+        previousConfig.provider = existingRoot.provider;
       }
       backup.config.installed = installedRoot;
 
       backup.auth ??= {};
+      const authBackup = backup.auth;
       if (
-        backup.auth.previousOpenaiKey === undefined &&
+        authBackup.previousOpenaiKey === undefined &&
         existingOpenaiKey &&
         existingOpenaiKey !== apiKey
       ) {
-        backup.auth.previousOpenaiKey = existingOpenaiKey;
+        authBackup.previousOpenaiKey = existingOpenaiKey;
       }
-      backup.auth.installedOpenaiKey = apiKey;
+      authBackup.installedOpenaiKey = apiKey;
       writeCodexBackup(backup);
 
       const mergedConfig = mergeCodexToml(existingConfig, {
@@ -248,11 +251,16 @@ export const registerCodexCommand = (program: Command) => {
       const authContent = authExists
         ? fs.readFileSync(authPath, "utf8").trim()
         : "";
-      const authData = authExists
-        ? authContent
-          ? (JSON.parse(authContent) as Record<string, unknown>)
-          : {}
-        : null;
+
+      let authData: Record<string, unknown> | null = null;
+      if (authExists) {
+        if (authContent) {
+          authData = JSON.parse(authContent) as Record<string, unknown>;
+        } else {
+          authData = {};
+        }
+      }
+
       const authResult = authData
         ? removeAuthJson(authData, {
             installed: installedOpenaiKey,

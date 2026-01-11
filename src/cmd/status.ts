@@ -4,9 +4,26 @@ import { getAuthStatus } from "../core/auth";
 
 const LABEL_WIDTH = 10;
 
-const formatLine = (label: string, value: string | number | undefined) => {
+type LineValue = string | number | undefined;
+
+type SectionLine = readonly [label: string, value: LineValue];
+type SectionItem = SectionLine | false | null | undefined;
+
+const line = (label: string, value: LineValue): SectionLine => [label, value];
+
+const formatLine = (label: string, value: LineValue) => {
   if (value == null || value === "") return null;
   return `  ${label.padEnd(LABEL_WIDTH, " ")}: ${value}`;
+};
+
+const renderSection = (title: string, items: SectionItem[]) => {
+  const lines: string[] = [];
+  for (const item of items) {
+    if (!item) continue;
+    const rendered = formatLine(item[0], item[1]);
+    if (rendered) lines.push(rendered);
+  }
+  return [title, ...lines].join("\n");
 };
 
 const formatAuthStatus = (status: "logged_in" | "logged_out") =>
@@ -43,53 +60,46 @@ const formatLimits = (
 
 const renderAuthSection = () => {
   const status = getAuthStatus();
-  const lines = [
-    formatLine("Status", formatAuthStatus(status.status)),
-    status.status === "logged_in"
-      ? formatLine("Expires", status.expiresAt)
-      : null,
-    status.status === "logged_in"
-      ? formatLine("TokenType", status.tokenType)
-      : null,
-    status.status === "logged_in"
-      ? formatLine("Access", formatToken(status.accessToken))
-      : null,
-    status.status === "logged_in"
-      ? formatLine("Refresh", formatToken(status.refreshToken))
-      : null,
-  ].filter(Boolean) as string[];
-  return ["🔐 Auth", ...lines].join("\n");
+  const logged = status.status === "logged_in";
+
+  return renderSection("🔐 Auth", [
+    line("Status", formatAuthStatus(status.status)),
+    logged && line("Expires", status.expiresAt),
+    logged && line("TokenType", status.tokenType),
+    logged && line("Access", formatToken(status.accessToken)),
+    logged && line("Refresh", formatToken(status.refreshToken)),
+  ]);
 };
 
-const renderSubscriptionSection = (
-  subscription: {
-    plan?: {
-      name?: string;
-      requestPerMinute?: number;
-      tokenPerMinute?: string | number;
-    };
-    status?: string;
-    startAt?: string;
-    endAt?: string;
-  } | null,
-) => {
+type Subscription = {
+  plan?: {
+    name?: string;
+    requestPerMinute?: number;
+    tokenPerMinute?: string | number;
+  };
+  status?: string;
+  startAt?: string;
+  endAt?: string;
+};
+
+const renderSubscriptionSection = (subscription: Subscription | null) => {
   if (!subscription) {
-    return ["📦 Subscription", formatLine("Status", "No active subscription")]
-      .filter(Boolean)
-      .join("\n");
+    return renderSection("📦 Subscription", [
+      line("Status", "No active subscription"),
+    ]);
   }
+
   const limits = formatLimits(
     subscription.plan?.requestPerMinute,
     subscription.plan?.tokenPerMinute,
   );
-  const windowLabel = formatWindow(subscription.startAt, subscription.endAt);
-  const lines = [
-    formatLine("Plan", subscription.plan?.name),
-    formatLine("Status", subscription.status),
-    formatLine("Window", windowLabel),
-    formatLine("Limits", limits),
-  ].filter(Boolean) as string[];
-  return ["📦 Subscription", ...lines].join("\n");
+
+  return renderSection("📦 Subscription", [
+    line("Plan", subscription.plan?.name),
+    line("Status", subscription.status),
+    line("Window", formatWindow(subscription.startAt, subscription.endAt)),
+    line("Limits", limits),
+  ]);
 };
 
 export const registerStatusCommand = (program: Command) => {

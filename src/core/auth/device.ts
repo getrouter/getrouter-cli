@@ -33,6 +33,12 @@ export const generateAuthCode = () => {
 export const buildLoginUrl = (authCode: string) =>
   `https://getrouter.dev/auth/${authCode}`;
 
+const getErrorCode = (err: unknown) => {
+  if (typeof err !== "object" || err === null) return undefined;
+  if (!("code" in err)) return undefined;
+  return (err as { code?: unknown }).code;
+};
+
 const spawnBrowser = (command: string, args: string[]) => {
   try {
     const child = spawn(command, args, {
@@ -40,16 +46,13 @@ const spawnBrowser = (command: string, args: string[]) => {
       detached: true,
     });
     child.on("error", (err) => {
-      const code =
-        typeof err === "object" && err !== null && "code" in err
-          ? (err as { code?: string }).code
-          : undefined;
-      const reason =
-        code === "ENOENT"
-          ? ` (${command} not found)`
-          : code
-            ? ` (${code})`
-            : "";
+      const code = getErrorCode(err);
+      let reason = "";
+      if (code === "ENOENT") {
+        reason = ` (${command} not found)`;
+      } else if (typeof code === "string") {
+        reason = ` (${code})`;
+      }
       console.log(
         `⚠️ Unable to open browser${reason}. Please open the URL manually.`,
       );
@@ -62,15 +65,20 @@ const spawnBrowser = (command: string, args: string[]) => {
 
 export const openLoginUrl = async (url: string) => {
   try {
-    if (process.platform === "darwin") {
-      spawnBrowser("open", [url]);
-      return;
-    }
-    if (process.platform === "win32") {
-      spawnBrowser("cmd", ["/c", "start", "", url]);
-      return;
-    }
-    spawnBrowser("xdg-open", [url]);
+    const platformCommands: Record<
+      string,
+      { command: string; args: string[] }
+    > = {
+      darwin: { command: "open", args: [url] },
+      win32: { command: "cmd", args: ["/c", "start", "", url] },
+    };
+
+    const entry = platformCommands[process.platform] ?? {
+      command: "xdg-open",
+      args: [url],
+    };
+
+    spawnBrowser(entry.command, entry.args);
   } catch {
     // best effort
   }
@@ -89,14 +97,19 @@ export const pollAuthorize = async ({
   const start = now();
   let delay = initialDelayMs;
   let attempt = 0;
+
+  const getErrorStatus = (err: unknown) => {
+    if (typeof err !== "object" || err === null) return undefined;
+    if (!("status" in err)) return undefined;
+    const status = (err as { status?: unknown }).status;
+    return typeof status === "number" ? status : undefined;
+  };
+
   while (true) {
     try {
       return await authorize({ code });
     } catch (err: unknown) {
-      const status =
-        typeof err === "object" && err !== null && "status" in err
-          ? (err as { status?: number }).status
-          : undefined;
+      const status = getErrorStatus(err);
       if (status === 404) {
         // keep polling
       } else if (status === 400) {
@@ -107,11 +120,13 @@ export const pollAuthorize = async ({
         throw err;
       }
     }
+
     if (now() - start >= timeoutMs) {
       throw new Error(
         "Login timed out. Please run getrouter auth login again.",
       );
     }
+
     attempt += 1;
     onRetry?.(attempt, delay);
     await sleep(delay);

@@ -1,38 +1,54 @@
-export type RetryOptions = {
+export interface RetryOptions {
   maxRetries?: number;
   initialDelayMs?: number;
   maxDelayMs?: number;
   shouldRetry?: (error: unknown, attempt: number) => boolean;
   onRetry?: (error: unknown, attempt: number, delayMs: number) => void;
   sleep?: (ms: number) => Promise<void>;
-};
+}
 
-const defaultSleep = (ms: number) =>
-  new Promise<void>((resolve) => setTimeout(resolve, ms));
+function defaultSleep(ms: number): Promise<void> {
+  return new Promise<void>((resolve) => setTimeout(resolve, ms));
+}
 
-const isRetryableError = (error: unknown): boolean => {
-  // Network errors (fetch failures)
+export function isServerError(status: number): boolean {
+  return status >= 500 || status === 408 || status === 429;
+}
+
+function getErrorStatus(error: unknown): number | undefined {
+  if (typeof error !== "object" || error === null) {
+    return undefined;
+  }
+
+  if (!("status" in error)) {
+    return undefined;
+  }
+
+  const status = (error as { status: unknown }).status;
+  if (typeof status !== "number") {
+    return undefined;
+  }
+
+  return status;
+}
+
+export function isRetryableError(error: unknown, _attempt?: number): boolean {
   if (error instanceof TypeError) {
     return true;
   }
-  // Errors with status codes
-  if (
-    typeof error === "object" &&
-    error !== null &&
-    "status" in error &&
-    typeof (error as { status: unknown }).status === "number"
-  ) {
-    const status = (error as { status: number }).status;
-    // Retry on 5xx server errors, 408 timeout, 429 rate limit
-    return status >= 500 || status === 408 || status === 429;
-  }
-  return false;
-};
 
-export const withRetry = async <T>(
+  const status = getErrorStatus(error);
+  if (status === undefined) {
+    return false;
+  }
+
+  return isServerError(status);
+}
+
+export async function withRetry<T>(
   fn: () => Promise<T>,
   options: RetryOptions = {},
-): Promise<T> => {
+): Promise<T> {
   const {
     maxRetries = 3,
     initialDelayMs = 1000,
@@ -62,7 +78,4 @@ export const withRetry = async <T>(
   }
 
   throw lastError;
-};
-
-export const isServerError = (status: number): boolean =>
-  status >= 500 || status === 408 || status === 429;
+}

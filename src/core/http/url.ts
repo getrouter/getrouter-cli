@@ -1,12 +1,17 @@
 import { readConfig } from "../config";
 
-export const getApiBase = () => {
+export function getApiBase(): string {
   const raw = readConfig().apiBase || "";
   return raw.replace(/\/+$/, "");
-};
+}
 
-export const buildApiUrl = (path: string) => {
+export function buildApiUrl(path: string): string {
   const base = getApiBase();
-  const normalized = path.replace(/^\/+/, "");
-  return base ? `${base}/${normalized}` : `/${normalized}`;
-};
+  const normalizedPath = path.replace(/^\/+/, "");
+
+  if (base) {
+    return `${base}/${normalizedPath}`;
+  }
+
+  return `/${normalizedPath}`;
+}

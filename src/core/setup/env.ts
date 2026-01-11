@@ -31,19 +31,21 @@ const renderLine = (shell: EnvShell, key: string, value: string) => {
 };
 
 export const renderEnv = (shell: EnvShell, vars: EnvVars) => {
+  const entries: Array<[keyof EnvVars, string]> = [
+    ["openaiBaseUrl", "OPENAI_BASE_URL"],
+    ["openaiApiKey", "OPENAI_API_KEY"],
+    ["anthropicBaseUrl", "ANTHROPIC_BASE_URL"],
+    ["anthropicApiKey", "ANTHROPIC_API_KEY"],
+  ];
+
   const lines: string[] = [];
-  if (vars.openaiBaseUrl) {
-    lines.push(renderLine(shell, "OPENAI_BASE_URL", vars.openaiBaseUrl));
+  for (const [varKey, envKey] of entries) {
+    const value = vars[varKey];
+    if (value) {
+      lines.push(renderLine(shell, envKey, value));
+    }
   }
-  if (vars.openaiApiKey) {
-    lines.push(renderLine(shell, "OPENAI_API_KEY", vars.openaiApiKey));
-  }
-  if (vars.anthropicBaseUrl) {
-    lines.push(renderLine(shell, "ANTHROPIC_BASE_URL", vars.anthropicBaseUrl));
-  }
-  if (vars.anthropicApiKey) {
-    lines.push(renderLine(shell, "ANTHROPIC_API_KEY", vars.anthropicApiKey));
-  }
+
   lines.push("");
   return lines.join("\n");
 };
@@ -206,8 +208,7 @@ export const trySourceEnv = (
       });
       return;
     }
-    const command = shell === "fish" ? "source" : "source";
-    execSync(`${shell} -c "${command} '${envPath}'"`, {
+    execSync(`${shell} -c "source '${envPath}'"`, {
       stdio: "ignore",
     });
   } catch {

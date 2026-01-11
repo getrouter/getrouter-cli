@@ -5,20 +5,22 @@ import type { routercommonv1_Model } from "../generated/router/dashboard/v1";
 
 const modelHeaders = ["ID", "NAME", "AUTHOR", "ENABLED", "UPDATED_AT"];
 
-const modelRow = (model: routercommonv1_Model) => [
-  String(model.id ?? ""),
-  String(model.name ?? ""),
-  String(model.author ?? ""),
-  String(model.enabled ?? ""),
-  String(model.updatedAt ?? ""),
-];
+function formatModelRow(model: routercommonv1_Model): string[] {
+  return [
+    String(model.id ?? ""),
+    String(model.name ?? ""),
+    String(model.author ?? ""),
+    String(model.enabled ?? ""),
+    String(model.updatedAt ?? ""),
+  ];
+}
 
-const outputModels = (models: routercommonv1_Model[]) => {
+function outputModels(models: routercommonv1_Model[]): void {
   console.log("🧠 Models");
-  console.log(renderTable(modelHeaders, models.map(modelRow)));
-};
+  console.log(renderTable(modelHeaders, models.map(formatModelRow)));
+}
 
-const listModels = async () => {
+async function listModels(): Promise<void> {
   const { modelService } = createApiClients({});
   const res = await modelService.ListModels({
     pageSize: undefined,
@@ -26,24 +28,20 @@ const listModels = async () => {
     filter: undefined,
   });
   const models = res?.models ?? [];
+
   if (models.length === 0) {
     console.log("😕 No models found");
     return;
   }
+
   outputModels(models);
-};
+}
 
-export const registerModelsCommands = (program: Command) => {
-  const models = program.command("models").description("List models");
-
-  models.action(async () => {
-    await listModels();
-  });
-
-  models
-    .command("list")
+export function registerModelsCommands(program: Command): void {
+  const models = program
+    .command("models")
     .description("List models")
-    .action(async () => {
-      await listModels();
-    });
-};
+    .action(listModels);
+
+  models.command("list").description("List models").action(listModels);
+}

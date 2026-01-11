@@ -66,18 +66,41 @@ const requireInteractiveForSelection = () =>
 const requireInteractiveForAction = (action: string) =>
   requireInteractive(`Interactive mode required for keys ${action}.`);
 
+type PromptKeyResult =
+  | { cancelled: true }
+  | { cancelled: false; name: string | undefined; enabled: boolean };
+
+const promptKeyDetails = async (
+  initialName: string | undefined,
+  initialEnabled: boolean,
+): Promise<PromptKeyResult> => {
+  const nameResult = await promptKeyName(initialName);
+  if (nameResult.cancelled) return { cancelled: true };
+
+  const enabledResult = await promptKeyEnabled(initialEnabled);
+  if (enabledResult.cancelled) return { cancelled: true };
+
+  return {
+    cancelled: false,
+    name: nameResult.name,
+    enabled: enabledResult.enabled,
+  };
+};
+
 const updateConsumer = async (
   consumerService: Pick<ConsumerService, "UpdateConsumer">,
   consumer: routercommonv1_Consumer,
   name: string | undefined,
   enabled: boolean | undefined,
 ) => {
-  const updateMask = [
-    name !== undefined && name !== consumer.name ? "name" : null,
-    enabled !== undefined && enabled !== consumer.enabled ? "enabled" : null,
-  ]
-    .filter(Boolean)
-    .join(",");
+  const updateMaskParts: string[] = [];
+  if (name !== undefined && name !== consumer.name) {
+    updateMaskParts.push("name");
+  }
+  if (enabled !== undefined && enabled !== consumer.enabled) {
+    updateMaskParts.push("enabled");
+  }
+  const updateMask = updateMaskParts.join(",");
   if (!updateMask) {
     return consumer;
   }
@@ -108,42 +131,32 @@ const listConsumers = async (
   outputConsumers(sorted, showApiKey);
 };
 
-const resolveConsumerForUpdate = async (
+const resolveConsumer = async (
   consumerService: Pick<ConsumerService, "GetConsumer" | "ListConsumers">,
+  message: string,
   id?: string,
 ) => {
   if (id) {
     return consumerService.GetConsumer({ id });
   }
   requireInteractiveForSelection();
-  return await selectConsumerList(consumerService, "Select key to update");
-};
-
-const resolveConsumerForDelete = async (
-  consumerService: Pick<ConsumerService, "GetConsumer" | "ListConsumers">,
-  id?: string,
-) => {
-  if (id) {
-    return consumerService.GetConsumer({ id });
-  }
-  requireInteractiveForSelection();
-  return await selectConsumerList(consumerService, "Select key to delete");
+  return await selectConsumerList(consumerService, message);
 };
 
 const createConsumer = async (
   consumerService: Pick<ConsumerService, "CreateConsumer" | "UpdateConsumer">,
 ) => {
   requireInteractiveForAction("create");
-  const nameResult = await promptKeyName();
-  if (nameResult.cancelled) return;
-  const enabledResult = await promptKeyEnabled(true);
-  if (enabledResult.cancelled) return;
+
+  const details = await promptKeyDetails(undefined, true);
+  if (details.cancelled) return;
+
   let consumer = await consumerService.CreateConsumer({});
   consumer = await updateConsumer(
     consumerService,
     consumer,
-    nameResult.name,
-    enabledResult.enabled,
+    details.name,
+    details.enabled,
   );
   outputConsumerTable(consumer, true);
   console.log("Please store this API key securely.");
@@ -157,17 +170,24 @@ const updateConsumerById = async (
   id?: string,
 ) => {
   requireInteractiveForAction("update");
-  const selected = await resolveConsumerForUpdate(consumerService, id);
+  const selected = await resolveConsumer(
+    consumerService,
+    "Select key to update",
+    id,
+  );
   if (!selected?.id) return;
-  const nameResult = await promptKeyName(selected.name);
-  if (nameResult.cancelled) return;
-  const enabledResult = await promptKeyEnabled(selected.enabled ?? true);
-  if (enabledResult.cancelled) return;
+
+  const details = await promptKeyDetails(
+    selected.name,
+    selected.enabled ?? true,
+  );
+  if (details.cancelled) return;
+
   const consumer = await updateConsumer(
     consumerService,
     selected,
-    nameResult.name,
-    enabledResult.enabled,
+    details.name,
+    details.enabled,
   );
   outputConsumerTable(consumer, false);
 };
@@ -180,7 +200,11 @@ const deleteConsumerById = async (
   id?: string,
 ) => {
   requireInteractiveForAction("delete");
-  const selected = await resolveConsumerForDelete(consumerService, id);
+  const selected = await resolveConsumer(
+    consumerService,
+    "Select key to delete",
+    id,
+  );
   if (!selected?.id) return;
   const confirmed = await confirmDelete(selected);
   if (!confirmed) return;

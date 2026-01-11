@@ -55,6 +55,47 @@ const providerValues = () => ({
 const matchHeader = (line: string) => line.match(/^\s*\[([^\]]+)\]\s*$/);
 const matchKey = (line: string) => line.match(/^\s*([A-Za-z0-9_.-]+)\s*=/);
 
+const findSectionEnd = (lines: string[], startIndex: number) => {
+  for (let i = startIndex; i < lines.length; i += 1) {
+    if (matchHeader(lines[i] ?? "")) {
+      return i;
+    }
+  }
+  return lines.length;
+};
+
+const upsertKeyLines = <K extends string>(
+  lines: string[],
+  startIndex: number,
+  endIndex: number,
+  keys: readonly K[],
+  valueMap: Record<K, string>,
+) => {
+  const found = new Set<K>();
+
+  for (let i = startIndex; i < endIndex; i += 1) {
+    const keyMatch = matchKey(lines[i] ?? "");
+    if (!keyMatch) continue;
+
+    const key = keyMatch[1] as K;
+    if (!keys.includes(key)) continue;
+
+    lines[i] = `${key} = ${valueMap[key]}`;
+    found.add(key);
+  }
+
+  return found;
+};
+
+const missingKeyLines = <K extends string>(
+  keys: readonly K[],
+  found: Set<K>,
+  valueMap: Record<K, string>,
+) =>
+  keys
+    .filter((key) => !found.has(key))
+    .map((key) => `${key} = ${valueMap[key]}`);
+
 const parseTomlRhsValue = (rhs: string) => {
   const trimmed = rhs.trim();
   if (!trimmed) return "";
@@ -128,44 +169,26 @@ export const mergeCodexToml = (content: string, input: CodexConfigInput) => {
   const rootValueMap = rootValues(input);
   const providerValueMap = providerValues();
 
-  let currentSection: string | null = null;
-  let firstHeaderIndex: number | null = null;
-  const rootFound = new Set<string>();
+  const firstHeaderIndex = updated.findIndex((line) => matchHeader(line ?? ""));
+  const rootEnd = firstHeaderIndex === -1 ? updated.length : firstHeaderIndex;
 
-  // Update root keys that appear before any section headers.
-  for (let i = 0; i < updated.length; i += 1) {
-    const headerMatch = matchHeader(updated[i] ?? "");
-    if (headerMatch) {
-      currentSection = headerMatch[1]?.trim() ?? null;
-      if (firstHeaderIndex === null) {
-        firstHeaderIndex = i;
-      }
-      continue;
-    }
-    if (currentSection !== null) {
-      continue;
-    }
-    const keyMatch = matchKey(updated[i] ?? "");
-    if (!keyMatch) continue;
-    const key = keyMatch[1] as keyof typeof rootValueMap;
-    if (ROOT_KEYS.includes(key)) {
-      updated[i] = `${key} = ${rootValueMap[key]}`;
-      rootFound.add(key);
-    }
-  }
-
-  // Insert missing root keys before the first section header (or at EOF).
-  const insertIndex = firstHeaderIndex ?? updated.length;
-  const missingRoot = ROOT_KEYS.filter((key) => !rootFound.has(key)).map(
-    (key) => `${key} = ${rootValueMap[key]}`,
+  const rootFound = upsertKeyLines(
+    updated,
+    0,
+    rootEnd,
+    ROOT_KEYS,
+    rootValueMap,
   );
+
+  const missingRoot = missingKeyLines(ROOT_KEYS, rootFound, rootValueMap);
   if (missingRoot.length > 0) {
+    const insertIndex = rootEnd;
     const needsBlank =
       insertIndex < updated.length && updated[insertIndex]?.trim() !== "";
+
     updated.splice(insertIndex, 0, ...missingRoot, ...(needsBlank ? [""] : []));
   }
 
-  // Ensure the provider section exists and keep its keys in sync.
   const providerHeader = `[${PROVIDER_SECTION}]`;
   const providerHeaderIndex = updated.findIndex(
     (line) => line.trim() === providerHeader,
@@ -174,36 +197,29 @@ export const mergeCodexToml = (content: string, input: CodexConfigInput) => {
     if (updated.length > 0 && updated[updated.length - 1]?.trim() !== "") {
       updated.push("");
     }
-    updated.push(providerHeader);
-    for (const key of PROVIDER_KEYS) {
-      updated.push(`${key} = ${providerValueMap[key]}`);
-    }
+    updated.push(
+      providerHeader,
+      ...PROVIDER_KEYS.map((key) => `${key} = ${providerValueMap[key]}`),
+    );
     return updated.join("\n");
   }
 
-  // Find the provider section bounds for in-place updates.
-  let providerEnd = updated.length;
-  for (let i = providerHeaderIndex + 1; i < updated.length; i += 1) {
-    if (matchHeader(updated[i] ?? "")) {
-      providerEnd = i;
-      break;
-    }
-  }
+  const providerStart = providerHeaderIndex + 1;
+  const providerEnd = findSectionEnd(updated, providerStart);
 
-  const providerFound = new Set<string>();
-  for (let i = providerHeaderIndex + 1; i < providerEnd; i += 1) {
-    const keyMatch = matchKey(updated[i] ?? "");
-    if (!keyMatch) continue;
-    const key = keyMatch[1] as keyof typeof providerValueMap;
-    if (PROVIDER_KEYS.includes(key)) {
-      updated[i] = `${key} = ${providerValueMap[key]}`;
-      providerFound.add(key);
-    }
-  }
+  const providerFound = upsertKeyLines(
+    updated,
+    providerStart,
+    providerEnd,
+    PROVIDER_KEYS,
+    providerValueMap,
+  );
 
-  const missingProvider = PROVIDER_KEYS.filter(
-    (key) => !providerFound.has(key),
-  ).map((key) => `${key} = ${providerValueMap[key]}`);
+  const missingProvider = missingKeyLines(
+    PROVIDER_KEYS,
+    providerFound,
+    providerValueMap,
+  );
   if (missingProvider.length > 0) {
     updated.splice(providerEnd, 0, ...missingProvider);
   }

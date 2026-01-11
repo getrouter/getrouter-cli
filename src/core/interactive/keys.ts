@@ -126,10 +126,8 @@ export const promptKeyEnabled = async (
   };
 };
 
-export const selectConsumer = async (
-  consumerService: ConsumerService,
-): Promise<routercommonv1_Consumer | null> => {
-  const consumers = await fetchAllPages(
+const fetchConsumers = async (consumerService: ConsumerService) =>
+  fetchAllPages(
     (pageToken) =>
       consumerService.ListConsumers({
         pageSize: undefined,
@@ -138,6 +136,8 @@ export const selectConsumer = async (
     (res) => res?.consumers ?? [],
     (res) => res?.nextPageToken || undefined,
   );
+
+const ensureConsumers = (consumers: Consumer[]) => {
   if (consumers.length === 0) {
     console.log(
       "No available API keys. Create one at https://getrouter.dev/dashboard/keys",
@@ -145,11 +145,20 @@ export const selectConsumer = async (
     return null;
   }
   const sorted = sortConsumersByUpdatedAtDesc(consumers);
-  const nameCounts = buildNameCounts(sorted);
+  return { sorted, nameCounts: buildNameCounts(sorted) };
+};
+
+export const selectConsumer = async (
+  consumerService: ConsumerService,
+): Promise<routercommonv1_Consumer | null> => {
+  const consumers = await fetchConsumers(consumerService);
+  const prepared = ensureConsumers(consumers);
+  if (!prepared) return null;
+
   const selected = await fuzzySelect({
     message: "🔎 Search keys",
-    choices: sorted.map((consumer) => ({
-      title: formatChoice(consumer, nameCounts),
+    choices: prepared.sorted.map((consumer) => ({
+      title: formatChoice(consumer, prepared.nameCounts),
       value: consumer,
       keywords: [
         normalizeName(consumer),
@@ -165,29 +174,16 @@ export const selectConsumerList = async (
   consumerService: ConsumerService,
   message: string,
 ): Promise<routercommonv1_Consumer | null> => {
-  const consumers = await fetchAllPages(
-    (pageToken) =>
-      consumerService.ListConsumers({
-        pageSize: undefined,
-        pageToken,
-      }),
-    (res) => res?.consumers ?? [],
-    (res) => res?.nextPageToken || undefined,
-  );
-  if (consumers.length === 0) {
-    console.log(
-      "No available API keys. Create one at https://getrouter.dev/dashboard/keys",
-    );
-    return null;
-  }
-  const sorted = sortConsumersByUpdatedAtDesc(consumers);
-  const nameCounts = buildNameCounts(sorted);
+  const consumers = await fetchConsumers(consumerService);
+  const prepared = ensureConsumers(consumers);
+  if (!prepared) return null;
+
   const response = await prompts({
     type: "select",
     name: "value",
     message,
-    choices: sorted.map((consumer) => ({
-      title: formatChoice(consumer, nameCounts),
+    choices: prepared.sorted.map((consumer) => ({
+      title: formatChoice(consumer, prepared.nameCounts),
       value: consumer,
     })),
   });

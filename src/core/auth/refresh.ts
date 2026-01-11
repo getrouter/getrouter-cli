@@ -1,5 +1,6 @@
 import { readAuth, writeAuth } from "../config";
 import { buildApiUrl } from "../http/url";
+import { isTokenExpired } from "./index";
 
 type AuthToken = {
   accessToken: string | undefined;
@@ -9,12 +10,8 @@ type AuthToken = {
 
 const EXPIRY_BUFFER_MS = 60 * 1000; // Refresh 1 minute before expiry
 
-export const isTokenExpiringSoon = (expiresAt: string): boolean => {
-  if (!expiresAt) return true;
-  const t = Date.parse(expiresAt);
-  if (Number.isNaN(t)) return true;
-  return t <= Date.now() + EXPIRY_BUFFER_MS;
-};
+export const isTokenExpiringSoon = (expiresAt: string): boolean =>
+  isTokenExpired(expiresAt, EXPIRY_BUFFER_MS);
 
 export const refreshAccessToken = async ({
   fetchImpl,

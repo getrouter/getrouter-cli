@@ -1,7 +1,7 @@
 import { refreshAccessToken } from "../auth/refresh";
 import { readAuth } from "../config";
 import { createApiError } from "./errors";
-import { isServerError, withRetry } from "./retry";
+import { isRetryableError, withRetry } from "./retry";
 import { buildApiUrl } from "./url";
 
 type RequestInput = {
@@ -15,50 +15,48 @@ type RequestInput = {
   _retrySleep?: (ms: number) => Promise<void>;
 };
 
-const getAuthCookieName = () =>
-  process.env.GETROUTER_AUTH_COOKIE ||
-  process.env.KRATOS_AUTH_COOKIE ||
-  "access_token";
+function getAuthCookieName(): string {
+  const routerCookieName = process.env.GETROUTER_AUTH_COOKIE;
+  if (routerCookieName) {
+    return routerCookieName;
+  }
 
-const buildHeaders = (accessToken?: string): Record<string, string> => {
+  const kratosCookieName = process.env.KRATOS_AUTH_COOKIE;
+  if (kratosCookieName) {
+    return kratosCookieName;
+  }
+
+  return "access_token";
+}
+
+function buildHeaders(accessToken?: string): Record<string, string> {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
   };
+
   if (accessToken) {
     headers.Authorization = `Bearer ${accessToken}`;
     headers.Cookie = `${getAuthCookieName()}=${accessToken}`;
   }
-  return headers;
-};
 
-const doFetch = async (
+  return headers;
+}
+
+async function doFetch(
   url: string,
   method: string,
   headers: Record<string, string>,
   body: unknown,
   fetchImpl?: typeof fetch,
-): Promise<Response> => {
+): Promise<Response> {
   return (fetchImpl ?? fetch)(url, {
     method,
     headers,
     body: body == null ? undefined : JSON.stringify(body),
   });
-};
+}
 
-const shouldRetryResponse = (error: unknown): boolean => {
-  if (
-    typeof error === "object" &&
-    error !== null &&
-    "status" in error &&
-    typeof (error as { status: unknown }).status === "number"
-  ) {
-    return isServerError((error as { status: number }).status);
-  }
-  // Retry on network errors (TypeError from fetch)
-  return error instanceof TypeError;
-};
-
-export const requestJson = async <T = unknown>({
+export async function requestJson<T = unknown>({
   path,
   method,
   body,
@@ -66,21 +64,17 @@ export const requestJson = async <T = unknown>({
   maxRetries = 3,
   includeAuth = true,
   _retrySleep,
-}: RequestInput): Promise<T> => {
+}: RequestInput): Promise<T> {
   return withRetry(
     async () => {
-      const auth = includeAuth
-        ? readAuth()
-        : { accessToken: undefined, refreshToken: undefined };
       const url = buildApiUrl(path);
-      const headers = includeAuth
-        ? buildHeaders(auth.accessToken)
-        : buildHeaders();
+      const auth = includeAuth ? readAuth() : undefined;
+      const headers = buildHeaders(auth?.accessToken);
 
       let res = await doFetch(url, method, headers, body, fetchImpl);
 
       // On 401, attempt token refresh and retry once
-      if (includeAuth && res.status === 401 && auth.refreshToken) {
+      if (includeAuth && res.status === 401 && auth?.refreshToken) {
         const refreshed = await refreshAccessToken({ fetchImpl });
         if (refreshed?.accessToken) {
           const newHeaders = buildHeaders(refreshed.accessToken);
@@ -92,12 +86,13 @@ export const requestJson = async <T = unknown>({
         const payload = await res.json().catch(() => null);
         throw createApiError(payload, res.statusText, res.status);
       }
+
       return (await res.json()) as T;
     },
     {
       maxRetries,
-      shouldRetry: shouldRetryResponse,
+      shouldRetry: isRetryableError,
       sleep: _retrySleep,
     },
   );
-};
+}

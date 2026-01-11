@@ -43,25 +43,23 @@ export type ApiClients = {
   usageService: UsageService;
 };
 
-export const createApiClients = ({
+const defaultFactories: ClientFactories = {
+  createConsumerServiceClient,
+  createAuthServiceClient,
+  createSubscriptionServiceClient,
+  createUsageServiceClient,
+  createModelServiceClient,
+};
+
+export function createApiClients({
   fetchImpl,
-  clients,
+  clients: factories = defaultFactories,
   includeAuth = true,
 }: {
   fetchImpl?: typeof fetch;
   clients?: ClientFactories;
   includeAuth?: boolean;
-}): ApiClients => {
-  const factories =
-    clients ??
-    ({
-      createConsumerServiceClient,
-      createAuthServiceClient,
-      createSubscriptionServiceClient,
-      createUsageServiceClient,
-      createModelServiceClient,
-    } satisfies ClientFactories);
-
+} = {}): ApiClients {
   const handler: RequestHandler = async ({ path, method, body }) => {
     return requestJson({
       path,
@@ -79,4 +77,4 @@ export const createApiClients = ({
     subscriptionService: factories.createSubscriptionServiceClient(handler),
     usageService: factories.createUsageServiceClient(handler),
   };
-};
+}

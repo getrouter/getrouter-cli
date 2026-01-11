@@ -1,32 +1,40 @@
-export type ApiError = {
+export interface ApiError {
   code?: string;
   message: string;
   details?: unknown;
   status?: number;
-};
+}
 
-export const createApiError = (
+export function createApiError(
   payload: unknown,
   fallbackMessage: string,
   status?: number,
-) => {
+): Error & ApiError {
   const payloadObject =
     payload && typeof payload === "object"
       ? (payload as Record<string, unknown>)
       : undefined;
+
   const message =
-    payloadObject && typeof payloadObject.message === "string"
+    typeof payloadObject?.message === "string"
       ? payloadObject.message
       : fallbackMessage;
+
   const err = new Error(message) as Error & ApiError;
-  if (payloadObject && typeof payloadObject.code === "string") {
-    err.code = payloadObject.code;
+
+  const code = payloadObject?.code;
+  if (typeof code === "string") {
+    err.code = code;
   }
-  if (payloadObject && payloadObject.details != null) {
-    err.details = payloadObject.details;
+
+  const details = payloadObject?.details;
+  if (details != null) {
+    err.details = details;
   }
+
   if (typeof status === "number") {
     err.status = status;
   }
+
   return err;
-};
+}

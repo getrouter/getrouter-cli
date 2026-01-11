@@ -10,17 +10,17 @@ type AuthStatus = {
   tokenType?: string;
 };
 
-const isExpired = (expiresAt: string) => {
+export const isTokenExpired = (expiresAt: string, bufferMs = 0) => {
   if (!expiresAt) return true;
   const t = Date.parse(expiresAt);
   if (Number.isNaN(t)) return true;
-  return t <= Date.now();
+  return t <= Date.now() + bufferMs;
 };
 
 export const getAuthStatus = (): AuthStatus => {
   const auth = readAuth();
   const hasTokens = Boolean(auth.accessToken && auth.refreshToken);
-  if (!hasTokens || isExpired(auth.expiresAt)) {
+  if (!hasTokens || isTokenExpired(auth.expiresAt)) {
     return { status: "logged_out" };
   }
   return {
