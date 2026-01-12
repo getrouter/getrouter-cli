@@ -19,23 +19,23 @@ type CopyOptions = {
   spawnFn?: SpawnLike;
 };
 
-export const getClipboardCommands = (
+export function getClipboardCommands(
   platform: NodeJS.Platform,
-): ClipboardCommand[] => {
+): ClipboardCommand[] {
   if (platform === "darwin") return [{ command: "pbcopy", args: [] }];
   if (platform === "win32") return [{ command: "clip", args: [] }];
   return [
     { command: "wl-copy", args: [] },
     { command: "xclip", args: ["-selection", "clipboard"] },
   ];
-};
+}
 
-const runClipboardCommand = (
+function runClipboardCommand(
   text: string,
   command: ClipboardCommand,
   spawnFn: SpawnLike,
-): Promise<boolean> =>
-  new Promise((resolve) => {
+): Promise<boolean> {
+  return new Promise((resolve) => {
     const child = spawnFn(command.command, command.args, {
       stdio: ["pipe", "ignore", "ignore"],
     });
@@ -44,11 +44,12 @@ const runClipboardCommand = (
     child.stdin.write(text);
     child.stdin.end();
   });
+}
 
-export const copyToClipboard = async (
+export async function copyToClipboard(
   text: string,
   options: CopyOptions = {},
-) => {
+): Promise<boolean> {
   if (!text) return false;
   const platform = options.platform ?? process.platform;
   const spawnFn = options.spawnFn ?? spawn;
@@ -58,4 +59,4 @@ export const copyToClipboard = async (
     if (ok) return true;
   }
   return false;
-};
+}

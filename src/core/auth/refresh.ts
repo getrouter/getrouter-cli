@@ -10,15 +10,20 @@ type AuthToken = {
 
 const EXPIRY_BUFFER_MS = 60 * 1000; // Refresh 1 minute before expiry
 
-export const isTokenExpiringSoon = (expiresAt: string): boolean =>
-  isTokenExpired(expiresAt, EXPIRY_BUFFER_MS);
-
-export const refreshAccessToken = async ({
-  fetchImpl,
-}: {
+type RefreshOptions = {
   fetchImpl?: typeof fetch;
-}): Promise<AuthToken | null> => {
+};
+
+export function isTokenExpiringSoon(expiresAt: string): boolean {
+  return isTokenExpired(expiresAt, EXPIRY_BUFFER_MS);
+}
+
+export async function refreshAccessToken(
+  options: RefreshOptions,
+): Promise<AuthToken | null> {
+  const { fetchImpl } = options;
   const auth = readAuth();
+
   if (!auth.refreshToken) {
     return null;
   }
@@ -45,21 +50,24 @@ export const refreshAccessToken = async ({
       tokenType: "Bearer",
     });
   }
-  return token;
-};
 
-export const ensureValidToken = async ({
-  fetchImpl,
-}: {
-  fetchImpl?: typeof fetch;
-}): Promise<boolean> => {
+  return token;
+}
+
+export async function ensureValidToken(
+  options: RefreshOptions,
+): Promise<boolean> {
+  const { fetchImpl } = options;
   const auth = readAuth();
+
   if (!auth.accessToken || !auth.refreshToken) {
     return false;
   }
+
   if (!isTokenExpiringSoon(auth.expiresAt)) {
     return true;
   }
+
   const refreshed = await refreshAccessToken({ fetchImpl });
   return refreshed !== null && Boolean(refreshed.accessToken);
-};
+}

@@ -32,10 +32,10 @@ type EnvCommandConfig = {
   vars: (apiKey: string) => EnvVars;
 };
 
-export const registerEnvCommand = (
+export function registerEnvCommand(
   program: Command,
   config: EnvCommandConfig,
-) => {
+): void {
   program
     .command(config.name)
     .description(config.description)
@@ -90,14 +90,18 @@ export const registerEnvCommand = (
         console.log(sourceLine);
       }
     });
-};
+}
 
-export const buildOpenAIEnv = (apiKey: string): EnvVars => ({
-  openaiBaseUrl: CODEX_BASE_URL,
-  openaiApiKey: apiKey,
-});
+export function buildOpenAIEnv(apiKey: string): EnvVars {
+  return {
+    openaiBaseUrl: CODEX_BASE_URL,
+    openaiApiKey: apiKey,
+  };
+}
 
-export const buildAnthropicEnv = (apiKey: string): EnvVars => ({
-  anthropicBaseUrl: CLAUDE_BASE_URL,
-  anthropicApiKey: apiKey,
-});
+export function buildAnthropicEnv(apiKey: string): EnvVars {
+  return {
+    anthropicBaseUrl: CLAUDE_BASE_URL,
+    anthropicApiKey: apiKey,
+  };
+}

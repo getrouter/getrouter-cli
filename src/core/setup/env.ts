@@ -13,7 +13,7 @@ export type EnvShell = "sh" | "ps1";
 
 export type RcShell = "zsh" | "bash" | "fish" | "pwsh";
 
-const quoteEnvValue = (shell: EnvShell, value: string) => {
+function quoteEnvValue(shell: EnvShell, value: string): string {
   if (shell === "ps1") {
     // PowerShell: single quotes are literal; escape by doubling.
     return `'${value.replaceAll("'", "''")}'`;
@@ -21,16 +21,16 @@ const quoteEnvValue = (shell: EnvShell, value: string) => {
 
   // POSIX shell: use single quotes; escape embedded single quotes with: '\''.
   return `'${value.replaceAll("'", "'\\''")}'`;
-};
+}
 
-const renderLine = (shell: EnvShell, key: string, value: string) => {
+function renderLine(shell: EnvShell, key: string, value: string): string {
   if (shell === "ps1") {
     return `$env:${key}=${quoteEnvValue(shell, value)}`;
   }
   return `export ${key}=${quoteEnvValue(shell, value)}`;
-};
+}
 
-export const renderEnv = (shell: EnvShell, vars: EnvVars) => {
+export function renderEnv(shell: EnvShell, vars: EnvVars): string {
   const entries: Array<[keyof EnvVars, string]> = [
     ["openaiBaseUrl", "OPENAI_BASE_URL"],
     ["openaiApiKey", "OPENAI_API_KEY"],
@@ -48,10 +48,10 @@ export const renderEnv = (shell: EnvShell, vars: EnvVars) => {
 
   lines.push("");
   return lines.join("\n");
-};
+}
 
 // Wrap getrouter to source env after successful codex/claude runs.
-export const renderHook = (shell: RcShell) => {
+export function renderHook(shell: RcShell): string {
   if (shell === "pwsh") {
     return [
       "function getrouter {",
@@ -123,27 +123,31 @@ export const renderHook = (shell: RcShell) => {
     "}",
     "",
   ].join("\n");
-};
+}
 
-export const getEnvFilePath = (shell: EnvShell, configDir: string) =>
-  path.join(configDir, shell === "ps1" ? "env.ps1" : "env.sh");
+export function getEnvFilePath(shell: EnvShell, configDir: string): string {
+  return path.join(configDir, shell === "ps1" ? "env.ps1" : "env.sh");
+}
 
-export const getHookFilePath = (shell: RcShell, configDir: string) => {
+export function getHookFilePath(shell: RcShell, configDir: string): string {
   if (shell === "pwsh") return path.join(configDir, "hook.ps1");
   if (shell === "fish") return path.join(configDir, "hook.fish");
   return path.join(configDir, "hook.sh");
-};
+}
 
-export const writeEnvFile = (filePath: string, content: string) => {
+export function writeEnvFile(filePath: string, content: string): void {
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
   fs.writeFileSync(filePath, content, "utf8");
   if (process.platform !== "win32") {
     // Limit env file readability since it can contain API keys.
     fs.chmodSync(filePath, 0o600);
   }
-};
+}
 
-export const resolveShellRcPath = (shell: RcShell, homeDir: string) => {
+export function resolveShellRcPath(
+  shell: RcShell,
+  homeDir: string,
+): string | null {
   if (shell === "zsh") return path.join(homeDir, ".zshrc");
   if (shell === "bash") return path.join(homeDir, ".bashrc");
   if (shell === "fish") return path.join(homeDir, ".config/fish/config.fish");
@@ -160,12 +164,13 @@ export const resolveShellRcPath = (shell: RcShell, homeDir: string) => {
     );
   }
   return null;
-};
+}
 
-export const resolveEnvShell = (shell: RcShell): EnvShell =>
-  shell === "pwsh" ? "ps1" : "sh";
+export function resolveEnvShell(shell: RcShell): EnvShell {
+  return shell === "pwsh" ? "ps1" : "sh";
+}
 
-export const detectShell = (): RcShell => {
+export function detectShell(): RcShell {
   const shellPath = process.env.SHELL;
   if (shellPath) {
     const name = shellPath.split("/").pop()?.toLowerCase();
@@ -180,9 +185,9 @@ export const detectShell = (): RcShell => {
   }
   if (process.platform === "win32") return "pwsh";
   return "bash";
-};
+}
 
-export const applyEnvVars = (vars: EnvVars) => {
+export function applyEnvVars(vars: EnvVars): void {
   if (vars.openaiBaseUrl) process.env.OPENAI_BASE_URL = vars.openaiBaseUrl;
   if (vars.openaiApiKey) process.env.OPENAI_API_KEY = vars.openaiApiKey;
   if (vars.anthropicBaseUrl) {
@@ -191,16 +196,17 @@ export const applyEnvVars = (vars: EnvVars) => {
   if (vars.anthropicApiKey) {
     process.env.ANTHROPIC_API_KEY = vars.anthropicApiKey;
   }
-};
+}
 
-export const formatSourceLine = (shell: EnvShell, envPath: string) =>
-  shell === "ps1" ? `. ${envPath}` : `source ${envPath}`;
+export function formatSourceLine(shell: EnvShell, envPath: string): string {
+  return shell === "ps1" ? `. ${envPath}` : `source ${envPath}`;
+}
 
-export const trySourceEnv = (
+export function trySourceEnv(
   shell: RcShell,
   envShell: EnvShell,
   envPath: string,
-) => {
+): void {
   try {
     if (envShell === "ps1") {
       execSync(`pwsh -NoProfile -Command ". '${envPath}'"`, {
@@ -214,9 +220,9 @@ export const trySourceEnv = (
   } catch {
     // Best-effort: ignore failures and let the caller print instructions.
   }
-};
+}
 
-export const appendRcIfMissing = (rcPath: string, line: string) => {
+export function appendRcIfMissing(rcPath: string, line: string): boolean {
   let content = "";
   if (fs.existsSync(rcPath)) {
     content = fs.readFileSync(rcPath, "utf8");
@@ -226,4 +232,4 @@ export const appendRcIfMissing = (rcPath: string, line: string) => {
   fs.mkdirSync(path.dirname(rcPath), { recursive: true });
   fs.writeFileSync(rcPath, `${content}${prefix}${line}\n`, "utf8");
   return true;
-};
+}

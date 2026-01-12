@@ -9,7 +9,7 @@ import {
 } from "../core/auth/device";
 import { writeAuth } from "../core/config";
 
-export const registerAuthCommands = (program: Command) => {
+export function registerAuthCommands(program: Command): void {
   program
     .command("login")
     .description("Login with device flow")
@@ -41,4 +41,4 @@ export const registerAuthCommands = (program: Command) => {
       clearAuth();
       console.log("Cleared local auth data.");
     });
-};
+}

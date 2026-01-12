@@ -10,14 +10,18 @@ export type AuthState = {
   tokenType: string;
 };
 
-export const defaultConfig = (): ConfigFile => ({
-  apiBase: "https://getrouter.dev",
-  json: false,
-});
+export function defaultConfig(): ConfigFile {
+  return {
+    apiBase: "https://getrouter.dev",
+    json: false,
+  };
+}
 
-export const defaultAuthState = (): AuthState => ({
-  accessToken: "",
-  refreshToken: "",
-  expiresAt: "",
-  tokenType: "Bearer",
-});
+export function defaultAuthState(): AuthState {
+  return {
+    accessToken: "",
+    refreshToken: "",
+    expiresAt: "",
+    tokenType: "Bearer",
+  };
+}

@@ -6,11 +6,11 @@
  * @param getNextToken - Function that extracts the next page token from the response
  * @returns Array of all items across all pages
  */
-export const fetchAllPages = async <TResponse, TItem>(
+export async function fetchAllPages<TResponse, TItem>(
   fetchPage: (pageToken?: string) => Promise<TResponse>,
   getItems: (response: TResponse) => TItem[],
   getNextToken: (response: TResponse) => string | undefined,
-): Promise<TItem[]> => {
+): Promise<TItem[]> {
   const allItems: TItem[] = [];
   let pageToken: string | undefined;
 
@@ -22,4 +22,4 @@ export const fetchAllPages = async <TResponse, TItem>(
   } while (pageToken);
 
   return allItems;
-};
+}

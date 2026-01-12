@@ -107,7 +107,7 @@ type CodexCommandOptions = {
   model?: string;
 };
 
-export const registerCodexCommand = (program: Command) => {
+export function registerCodexCommand(program: Command): void {
   const codex = program.command("codex").description("Configure Codex");
 
   codex
@@ -291,4 +291,4 @@ export const registerCodexCommand = (program: Command) => {
         fs.unlinkSync(backupPath);
       }
     });
-};
+}

@@ -7,7 +7,7 @@ import { registerModelsCommands } from "./models";
 import { registerStatusCommand } from "./status";
 import { registerUsagesCommand } from "./usages";
 
-export const registerCommands = (program: Command) => {
+export function registerCommands(program: Command): void {
   registerAuthCommands(program);
   registerCodexCommand(program);
   registerClaudeCommand(program);
@@ -15,4 +15,4 @@ export const registerCommands = (program: Command) => {
   registerModelsCommands(program);
   registerStatusCommand(program);
   registerUsagesCommand(program);
-};
+}

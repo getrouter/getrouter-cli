@@ -1,16 +1,16 @@
 type TableOptions = { maxColWidth?: number };
 
-const truncate = (value: string, max: number) => {
+function truncate(value: string, max: number): string {
   if (value.length <= max) return value;
   if (max <= 3) return value.slice(0, max);
   return `${value.slice(0, max - 3)}...`;
-};
+}
 
-export const renderTable = (
+export function renderTable(
   headers: string[],
   rows: string[][],
   options: TableOptions = {},
-) => {
+): string {
   const maxColWidth = options.maxColWidth ?? 32;
   const normalized = rows.map((row) =>
     row.map((cell) => (cell && cell.length > 0 ? cell : "-")),
@@ -31,4 +31,4 @@ export const renderTable = (
   const headerRow = renderRow(headers);
   const body = normalized.map((row) => renderRow(row)).join("\n");
   return `${headerRow}\n${body}`;
-};
+}

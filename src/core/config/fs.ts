@@ -1,16 +1,16 @@
 import fs from "node:fs";
 import path from "node:path";
 
-const getCorruptBackupPath = (filePath: string) => {
+function getCorruptBackupPath(filePath: string): string {
   const dir = path.dirname(filePath);
   const ext = path.extname(filePath);
   const base = path.basename(filePath, ext);
   const stamp = new Date().toISOString().replace(/[:.]/g, "-");
   const rand = Math.random().toString(16).slice(2, 8);
   return path.join(dir, `${base}.corrupt-${stamp}-${rand}${ext}`);
-};
+}
 
-export const readJsonFile = <T = unknown>(filePath: string): T | null => {
+export function readJsonFile<T = unknown>(filePath: string): T | null {
   if (!fs.existsSync(filePath)) return null;
   let raw: string;
   try {
@@ -36,9 +36,9 @@ export const readJsonFile = <T = unknown>(filePath: string): T | null => {
     }
     return null;
   }
-};
+}
 
-export const writeJsonFile = (filePath: string, value: unknown) => {
+export function writeJsonFile(filePath: string, value: unknown): void {
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
   fs.writeFileSync(filePath, JSON.stringify(value, null, 2), "utf8");
-};
+}

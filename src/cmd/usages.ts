@@ -8,7 +8,7 @@ type UsageListResponse = {
   nextPageToken?: string;
 };
 
-const collectUsages = async () => {
+async function collectUsages(): Promise<ReturnType<typeof aggregateUsages>> {
   const { usageService } = createApiClients({});
   const res = (await usageService.ListUsage({
     pageSize: 7,
@@ -16,9 +16,9 @@ const collectUsages = async () => {
   })) as UsageListResponse;
   const usages = res?.usages ?? [];
   return aggregateUsages(usages, 7);
-};
+}
 
-export const registerUsagesCommand = (program: Command) => {
+export function registerUsagesCommand(program: Command): void {
   program
     .command("usages")
     .description("Show recent usage")
@@ -26,4 +26,4 @@ export const registerUsagesCommand = (program: Command) => {
       const aggregated = await collectUsages();
       console.log(renderUsageChart(aggregated));
     });
-};
+}

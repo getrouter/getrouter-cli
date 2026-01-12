@@ -1,12 +1,12 @@
 const SECRET_KEYS = new Set(["accessToken", "refreshToken", "apiKey"]);
 
-const mask = (value: string) => {
+function mask(value: string): string {
   if (!value) return "";
   if (value.length <= 8) return "****";
   return `${value.slice(0, 4)}...${value.slice(-4)}`;
-};
+}
 
-export const redactSecrets = <T extends Record<string, unknown>>(obj: T): T => {
+export function redactSecrets<T extends Record<string, unknown>>(obj: T): T {
   const out: Record<string, unknown> = { ...obj };
   for (const key of Object.keys(out)) {
     const value = out[key];
@@ -15,4 +15,4 @@ export const redactSecrets = <T extends Record<string, unknown>>(obj: T): T => {
     }
   }
   return out as T;
-};
+}

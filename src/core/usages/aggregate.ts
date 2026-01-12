@@ -29,10 +29,10 @@ const toNumber = (value: number | string | undefined) => {
   return 0;
 };
 
-export const aggregateUsages = (
+export function aggregateUsages(
   usages: RawUsage[],
   maxDays = 7,
-): AggregatedUsage[] => {
+): AggregatedUsage[] {
   const totals = new Map<string, AggregatedUsage>();
 
   for (const usage of usages) {
@@ -66,4 +66,4 @@ export const aggregateUsages = (
   return Array.from(totals.values())
     .sort((a, b) => b.day.localeCompare(a.day))
     .slice(0, maxDays);
-};
+}

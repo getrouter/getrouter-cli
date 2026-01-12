@@ -212,7 +212,7 @@ const deleteConsumerById = async (
   outputConsumerTable(selected, false);
 };
 
-export const registerKeysCommands = (program: Command) => {
+export function registerKeysCommands(program: Command): void {
   const keys = program.command("keys").description("Manage API keys");
   keys.option("--show", "Show full API keys");
   keys.allowExcessArguments(false);
@@ -257,4 +257,4 @@ export const registerKeysCommands = (program: Command) => {
       const { consumerService } = createApiClients({});
       await deleteConsumerById(consumerService, id);
     });
-};
+}

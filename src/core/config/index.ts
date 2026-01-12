@@ -8,24 +8,29 @@ import {
   defaultConfig,
 } from "./types";
 
-export const readConfig = (): ConfigFile => ({
-  ...defaultConfig(),
-  ...(readJsonFile<ConfigFile>(getConfigPath()) ?? {}),
-});
+export function readConfig(): ConfigFile {
+  return {
+    ...defaultConfig(),
+    ...(readJsonFile<ConfigFile>(getConfigPath()) ?? {}),
+  };
+}
 
-export const writeConfig = (cfg: ConfigFile) =>
+export function writeConfig(cfg: ConfigFile): void {
   writeJsonFile(getConfigPath(), cfg);
+}
 
-export const readAuth = (): AuthState => ({
-  ...defaultAuthState(),
-  ...(readJsonFile<AuthState>(getAuthPath()) ?? {}),
-});
+export function readAuth(): AuthState {
+  return {
+    ...defaultAuthState(),
+    ...(readJsonFile<AuthState>(getAuthPath()) ?? {}),
+  };
+}
 
-export const writeAuth = (auth: AuthState) => {
+export function writeAuth(auth: AuthState): void {
   const authPath = getAuthPath();
   writeJsonFile(authPath, auth);
   if (process.platform !== "win32") {
     // Restrict token file permissions on Unix-like systems.
     fs.chmodSync(authPath, 0o600);
   }
-};
+}
